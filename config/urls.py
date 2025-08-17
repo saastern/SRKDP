@@ -18,11 +18,12 @@ from django.contrib import admin
 from django.urls import path,include
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
+from django.http import HttpResponse
 
-@csrf_exempt
+@csrf_exempt  
 def health_check(request):
-    return JsonResponse({"status": "ok"}, status=200)
+    return HttpResponse("OK", status=200, content_type='text/plain')
+
 
 
 
