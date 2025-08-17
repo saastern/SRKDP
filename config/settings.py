@@ -116,6 +116,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # =============================================================================
 
 # Default Database (Development)
+# =============================================================================
+# DATABASE CONFIGURATION - FIXED FOR RAILWAY
+# =============================================================================
+
+# Default Database (Development only)
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -127,14 +132,17 @@ DATABASES = {
     }
 }
 
-# FIXED: Production Database Configuration (Railway)
-if os.getenv('DATABASE_URL'):
+# CRITICAL: Production Database Configuration (Railway)
+DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL:
     DATABASES['default'] = dj_database_url.parse(
-        os.getenv('DATABASE_URL'),
+        DATABASE_URL,
         conn_max_age=600,
         conn_health_checks=True,
     )
-
+    print(f"🗄️ Using Railway PostgreSQL database")
+else:
+    print(f"🗄️ Using local database: {DATABASES['default']['NAME']}")
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -162,15 +170,15 @@ USE_TZ = True
 # STATIC FILES CONFIGURATION
 # =============================================================================
 
-# Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# FIXED: WhiteNoise configuration for production
+# FIXED: Only include static dir if it exists
+STATICFILES_DIRS = []
+if (BASE_DIR / 'static').exists():
+    STATICFILES_DIRS = [BASE_DIR / 'static']
+
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-STATICFILES_DIRS = [
-    BASE_DIR / 'static',
-]
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -281,7 +289,7 @@ LOGGING = {
 # =============================================================================
 # DEVELOPMENT OVERRIDES
 # =============================================================================
-
+DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'
 if DEBUG:
     print("🚨 DEVELOPMENT MODE ACTIVE")
     print(f"🌐 CORS allowed origins: {CORS_ALLOWED_ORIGINS}")
