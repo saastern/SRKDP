@@ -38,7 +38,7 @@ if os.getenv('DJANGO_ALLOWED_HOSTS'):
     ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS').split(',')]
 else:
     # Default for development
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.6']
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.6', 'healthcheck.railway.app']
 
 # Security Settings - Fixed logic
 if not DEBUG:  # Production settings
