@@ -295,3 +295,9 @@ if DEBUG:
     print(f"🌐 CORS allowed origins: {CORS_ALLOWED_ORIGINS}")
     print(f"🔗 Allowed hosts: {ALLOWED_HOSTS}")
     print(f"🗄️ Database: {DATABASES['default']['NAME']}")
+
+# Add this to see what's happening in Railway logs
+print(f"🔧 DATABASE_URL present: {bool(os.getenv('DATABASE_URL'))}")
+print(f"🔧 ALLOWED_HOSTS: {ALLOWED_HOSTS}")
+print(f"🔧 DEBUG: {DEBUG}")
+
