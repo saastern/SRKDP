@@ -13,9 +13,9 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-# FIXED: Import moved to top
 import dj_database_url
 from datetime import timedelta
+import re  # Added for database URL fix
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,8 +23,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Load environment variables from .env file
 load_dotenv(BASE_DIR / '.env')
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
+# =============================================================================
+# CORE SETTINGS
+# =============================================================================
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-change-this-in-production')
@@ -32,24 +33,27 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-change-this-in-prod
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() == 'true'
 
-# ALLOWED_HOSTS - Fixed to handle environment properly
-ALLOWED_HOSTS = []
-if os.getenv('DJANGO_ALLOWED_HOSTS'):
-    ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS').split(',')]
-else:
-    # Default for development
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.6', 'healthcheck.railway.app']
+# ALLOWED_HOSTS - Critical fix for Railway
+# -----------------------------------------------------------------------------
+ALLOWED_HOSTS = ['*']  # Temporary wide-open for debugging
 
-# Security Settings - Fixed logic
+# =============================================================================
+# SECURITY SETTINGS (Updated for Railway)
+# =============================================================================
+
+# Railway proxy configuration (CRITICAL FIX)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# SSL Settings - use environment variable
+SECURE_SSL_REDIRECT = os.getenv('DJANGO_SSL_REDIRECT', 'False').lower() == 'true'
+
 if not DEBUG:  # Production settings
-    SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 else:  # Development settings
-    SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
     SECURE_HSTS_SECONDS = 0
@@ -59,7 +63,17 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
-# Application definition
+# CSRF Trusted Origins (Required for POST requests)
+if not DEBUG:
+    CSRF_TRUSTED_ORIGINS = [
+        'https://srkdp-production.up.railway.app',
+        'https://*.railway.app'
+    ]
+
+# =============================================================================
+# APPLICATION DEFINITION
+# =============================================================================
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -78,10 +92,9 @@ INSTALLED_APPS = [
     'apps.notifications',
 ]
 
-# MIDDLEWARE - FIXED: Added WhiteNoise correctly
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # FIXED: Added for static files
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -112,38 +125,41 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 # =============================================================================
-# DATABASE CONFIGURATION
+# DATABASE CONFIGURATION (Fixed for Railway)
 # =============================================================================
 
-# Default Database (Development)
-# =============================================================================
-# DATABASE CONFIGURATION - FIXED FOR RAILWAY
-# =============================================================================
+# Fix DATABASE_URL format if needed (Railway uses postgresql://, Django needs postgres://)
+db_url = os.getenv('DATABASE_URL', '')
+if db_url.startswith('postgresql://'):
+    os.environ['DATABASE_URL'] = db_url.replace('postgresql://', 'postgres://', 1)
+    print("🔧 Fixed DATABASE_URL scheme")
 
-# Default Database (Development only)
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME', 'srkdb_1'),
-        'USER': os.getenv('DB_USER', 'admin1'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'admin'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+# Database configuration
+if 'DATABASE_URL' in os.environ:
+    DATABASES = {
+        'default': dj_database_url.config(
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
-}
-
-# CRITICAL: Production Database Configuration (Railway)
-DATABASE_URL = os.getenv('DATABASE_URL')
-if DATABASE_URL:
-    DATABASES['default'] = dj_database_url.parse(
-        DATABASE_URL,
-        conn_max_age=600,
-        conn_health_checks=True,
-    )
     print(f"🗄️ Using Railway PostgreSQL database")
 else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME', 'srkdb_1'),
+            'USER': os.getenv('DB_USER', 'admin1'),
+            'PASSWORD': os.getenv('DB_PASSWORD', 'admin'),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+        }
+    }
     print(f"🗄️ Using local database: {DATABASES['default']['NAME']}")
-# Password validation
+
+# =============================================================================
+# PASSWORD VALIDATION
+# =============================================================================
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -160,34 +176,55 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# Internationalization
+# =============================================================================
+# INTERNATIONALIZATION
+# =============================================================================
+
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
 # =============================================================================
-# STATIC FILES CONFIGURATION
+# STATIC FILES (CRITICAL FIXES FOR DEPLOYMENT)
 # =============================================================================
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# FIXED: Only include static dir if it exists
+# Create staticfiles directory if it doesn't exist
+if not os.path.exists(STATIC_ROOT):
+    os.makedirs(STATIC_ROOT)
+    print(f"📁 Created staticfiles directory at {STATIC_ROOT}")
+
+# Static files directories
 STATICFILES_DIRS = []
 if (BASE_DIR / 'static').exists():
     STATICFILES_DIRS = [BASE_DIR / 'static']
 
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Use simpler storage in production
+if not DEBUG:
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+else:
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Default primary key field type
+# Admin static files fallback
+ADMIN_MEDIA_PREFIX = '/static/admin/'
+
+# =============================================================================
+# DEFAULT PRIMARY KEY FIELD
+# =============================================================================
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Custom User Model
+# =============================================================================
+# CUSTOM USER MODEL
+# =============================================================================
+
 AUTH_USER_MODEL = 'users.User'
 
 # =============================================================================
-# DJANGO REST FRAMEWORK SETTINGS
+# DJANGO REST FRAMEWORK
 # =============================================================================
 
 REST_FRAMEWORK = {
@@ -232,9 +269,8 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
-# FIXED: Production CORS Override
+# Production CORS Override
 if not DEBUG:
-    # Override CORS for production - update after Vercel deployment
     production_origins = os.getenv('PRODUCTION_CORS_ORIGINS')
     if production_origins:
         CORS_ALLOWED_ORIGINS = [origin.strip() for origin in production_origins.split(',')]
@@ -287,11 +323,31 @@ LOGGING = {
 }
 
 # =============================================================================
-# DEVELOPMENT OVERRIDES
+# PRODUCTION TEMPLATE FIXES (CRITICAL FOR DEPLOYMENT)
 # =============================================================================
-DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'
-if DEBUG:
-    print("🚨 DEVELOPMENT MODE ACTIVE")
-    print(f"🌐 CORS allowed origins: {CORS_ALLOWED_ORIGINS}")
-    print(f"🔗 Allowed hosts: {ALLOWED_HOSTS}")
-    print(f"🗄️ Database: {DATABASES['default']['NAME']}")
+
+# Template caching for production
+if not DEBUG:
+    TEMPLATES[0]['OPTIONS']['loaders'] = [
+        ('django.template.loaders.cached.Loader', [
+            'django.template.loaders.filesystem.Loader',
+            'django.template.loaders.app_directories.Loader',
+        ]),
+    ]
+    print("🔧 Configured cached template loaders for production")
+
+# =============================================================================
+# RAILWAY DEPLOYMENT CHECKS
+# =============================================================================
+
+# Add this to see what's happening in Railway logs
+print("\n" + "="*80)
+print(f"🔧 DEBUG: {DEBUG}")
+print(f"🔧 ALLOWED_HOSTS: {ALLOWED_HOSTS}")
+print(f"🔧 DATABASE_URL present: {bool(os.getenv('DATABASE_URL'))}")
+print(f"🔧 SECURE_PROXY_SSL_HEADER: {SECURE_PROXY_SSL_HEADER}")
+print(f"🔧 SECURE_SSL_REDIRECT: {SECURE_SSL_REDIRECT}")
+print(f"🔧 CSRF_TRUSTED_ORIGINS: {CSRF_TRUSTED_ORIGINS if not DEBUG else 'N/A'}")
+print(f"🔧 STATIC_ROOT: {STATIC_ROOT}")
+print(f"🔧 STATICFILES_STORAGE: {STATICFILES_STORAGE}")
+print("="*80 + "\n")
