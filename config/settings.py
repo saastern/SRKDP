@@ -355,3 +355,52 @@ print(f"🔧 CSRF_TRUSTED_ORIGINS: {CSRF_TRUSTED_ORIGINS if not DEBUG else 'N/A'
 print(f"🔧 STATIC_ROOT: {STATIC_ROOT}")
 print(f"🔧 STATICFILES_STORAGE: {STATICFILES_STORAGE}")
 print("="*80 + "\n")
+
+
+
+# =============================================================================
+# AUTO SUPERUSER CREATION (For Railway Deployment)
+# =============================================================================
+
+import os
+if not DEBUG and os.environ.get('AUTO_CREATE_SUPERUSER', 'False').lower() == 'true':
+    from django.contrib.auth import get_user_model
+    from django.db.utils import OperationalError, ProgrammingError
+    from django.db import connection
+    import time
+    
+    # Wait for database to be ready
+    max_retries = 5
+    retry_delay = 2  # seconds
+    
+    for i in range(max_retries):
+        try:
+            # Try to execute a simple query to check if database is ready
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+            break
+        except (OperationalError, ProgrammingError):
+            if i < max_retries - 1:
+                print(f"⚠️ Database not ready, retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+            else:
+                print("❌ Could not connect to database after multiple attempts")
+                break
+    else:
+        try:
+            User = get_user_model()
+            username = os.environ.get('DJANGO_SUPERUSER_USERNAME', 'admin')
+            email = os.environ.get('DJANGO_SUPERUSER_EMAIL', 'admin@example.com')
+            password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', 'admin123')
+            
+            if not User.objects.filter(username=username).exists():
+                User.objects.create_superuser(
+                    username=username,
+                    email=email,
+                    password=password
+                )
+                print(f"✅ Superuser '{username}' created successfully")
+            else:
+                print(f"ℹ️ Superuser '{username}' already exists")
+        except Exception as e:
+            print(f"❌ Error creating superuser: {e}")
