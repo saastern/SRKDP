@@ -25,10 +25,15 @@ def health_check(request):
     return HttpResponse("OK", status=200, content_type='text/plain')
 
 
+def home_view(request):
+    return HttpResponse("School SaaS API is running!")
+
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('', home_view, name='home'),
+
     path('api/auth/', include('apps.users.urls')),
     path('health/', health_check, name='health_with_slash'),
     path('health', health_check, name='health_without_slash'),  
