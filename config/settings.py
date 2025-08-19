@@ -339,15 +339,9 @@ if not DEBUG:
 # =============================================================================
 # RAILWAY DEPLOYMENT CHECKS
 # =============================================================================
-
-# Add this to see what's happening in Railway logs
-print("\n" + "="*80)
-print(f"🔧 DEBUG: {DEBUG}")
-print(f"🔧 ALLOWED_HOSTS: {ALLOWED_HOSTS}")
-print(f"🔧 DATABASE_URL present: {bool(os.getenv('DATABASE_URL'))}")
-print(f"🔧 SECURE_PROXY_SSL_HEADER: {SECURE_PROXY_SSL_HEADER}")
-print(f"🔧 SECURE_SSL_REDIRECT: {SECURE_SSL_REDIRECT}")
-print(f"🔧 CSRF_TRUSTED_ORIGINS: {CSRF_TRUSTED_ORIGINS if not DEBUG else 'N/A'}")
-print(f"🔧 STATIC_ROOT: {STATIC_ROOT}")
-print(f"🔧 STATICFILES_STORAGE: {STATICFILES_STORAGE}")
-print("="*80 + "\n")
+DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'
+if DEBUG:
+    print("🚨 DEVELOPMENT MODE ACTIVE")
+    print(f"🌐 CORS allowed origins: {CORS_ALLOWED_ORIGINS}")
+    print(f"🔗 Allowed hosts: {ALLOWED_HOSTS}")
+    print(f"🗄️ Database: {DATABASES['default']['NAME']}")

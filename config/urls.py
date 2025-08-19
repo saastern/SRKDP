@@ -16,15 +16,22 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path,include
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
+
+@csrf_exempt  
 def health_check(request):
-    return HttpResponse("OK", status=200)
+    return HttpResponse("OK", status=200, content_type='text/plain')
+
+
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('apps.users.urls')),
-    path('health/', health_check, name='health'),
+    path('health/', health_check, name='health_with_slash'),
+    path('health', health_check, name='health_without_slash'),  
     path('api/teachers/', include('apps.teachers.urls')),
     path('api/attendance/', include('apps.attendance.urls')),
 ]  
