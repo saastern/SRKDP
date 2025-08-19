@@ -404,3 +404,38 @@ if not DEBUG and os.environ.get('AUTO_CREATE_SUPERUSER', 'False').lower() == 'tr
                 print(f"ℹ️ Superuser '{username}' already exists")
         except Exception as e:
             print(f"❌ Error creating superuser: {e}")
+# =============================================================================
+# DATABASE CONNECTION FIX (Add this to settings.py)
+# =============================================================================
+
+import time
+from django.db import connections
+from django.db.utils import OperationalError
+
+# Wait for database to be ready (more robust version)
+def wait_for_db():
+    """Wait for database to become available"""
+    max_retries = 10
+    retry_delay = 5  # seconds
+    
+    for i in range(max_retries):
+        try:
+            # Try to connect to all databases
+            for conn_name in connections:
+                connection = connections[conn_name]
+                if connection.vendor == 'postgresql':
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT 1")
+            print("✅ Database connection established")
+            return True
+        except OperationalError as e:
+            if i < max_retries - 1:
+                print(f"⚠️ Database not ready (attempt {i+1}/{max_retries}): {e}")
+                time.sleep(retry_delay)
+            else:
+                print(f"❌ Could not connect to database after {max_retries} attempts: {e}")
+                return False
+
+# Call this function during startup
+if not DEBUG:
+    wait_for_db()
