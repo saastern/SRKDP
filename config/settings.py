@@ -37,12 +37,6 @@ DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() == 'true'
 # -----------------------------------------------------------------------------
 ALLOWED_HOSTS = ['*']  # Temporary wide-open for debugging
 
-# Later replace with:
-# if os.getenv('DJANGO_ALLOWED_HOSTS'):
-#     ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS').split(',')]
-# else:
-#     ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.railway.app']
-
 # =============================================================================
 # SECURITY SETTINGS (Updated for Railway)
 # =============================================================================
@@ -192,17 +186,30 @@ USE_I18N = True
 USE_TZ = True
 
 # =============================================================================
-# STATIC FILES
+# STATIC FILES (CRITICAL FIXES FOR DEPLOYMENT)
 # =============================================================================
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# Create staticfiles directory if it doesn't exist
+if not os.path.exists(STATIC_ROOT):
+    os.makedirs(STATIC_ROOT)
+    print(f"📁 Created staticfiles directory at {STATIC_ROOT}")
+
+# Static files directories
 STATICFILES_DIRS = []
 if (BASE_DIR / 'static').exists():
     STATICFILES_DIRS = [BASE_DIR / 'static']
 
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Use simpler storage in production
+if not DEBUG:
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+else:
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Admin static files fallback
+ADMIN_MEDIA_PREFIX = '/static/admin/'
 
 # =============================================================================
 # DEFAULT PRIMARY KEY FIELD
@@ -316,6 +323,20 @@ LOGGING = {
 }
 
 # =============================================================================
+# PRODUCTION TEMPLATE FIXES (CRITICAL FOR DEPLOYMENT)
+# =============================================================================
+
+# Template caching for production
+if not DEBUG:
+    TEMPLATES[0]['OPTIONS']['loaders'] = [
+        ('django.template.loaders.cached.Loader', [
+            'django.template.loaders.filesystem.Loader',
+            'django.template.loaders.app_directories.Loader',
+        ]),
+    ]
+    print("🔧 Configured cached template loaders for production")
+
+# =============================================================================
 # RAILWAY DEPLOYMENT CHECKS
 # =============================================================================
 
@@ -327,4 +348,6 @@ print(f"🔧 DATABASE_URL present: {bool(os.getenv('DATABASE_URL'))}")
 print(f"🔧 SECURE_PROXY_SSL_HEADER: {SECURE_PROXY_SSL_HEADER}")
 print(f"🔧 SECURE_SSL_REDIRECT: {SECURE_SSL_REDIRECT}")
 print(f"🔧 CSRF_TRUSTED_ORIGINS: {CSRF_TRUSTED_ORIGINS if not DEBUG else 'N/A'}")
+print(f"🔧 STATIC_ROOT: {STATIC_ROOT}")
+print(f"🔧 STATICFILES_STORAGE: {STATICFILES_STORAGE}")
 print("="*80 + "\n")
