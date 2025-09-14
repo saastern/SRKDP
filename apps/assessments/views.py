@@ -32,7 +32,8 @@ def get_marks_sheet_data(request):
             academic_year = AcademicYear.objects.filter(is_current=True).first()
             selected_class = Class.objects.get(id=class_id)
             selected_exam = Exam.objects.get(id=exam_id)
-            
+            class_group = selected_class.class_group
+            max_marks = selected_exam.get_max_marks(class_group)
             # Get students in this class
             students = StudentProfile.objects.filter(
                 student_class=selected_class
@@ -78,7 +79,7 @@ def get_marks_sheet_data(request):
                     } for s in subjects
                 ],
                 'existing_marks': existing_marks,
-                'max_marks': 50
+                'max_marks': max_marks
             })
             
         except Exception as e:
@@ -97,6 +98,8 @@ def save_marks_sheet(request):
             for student_id, subjects_marks in data['marks'].items():
                 student = StudentProfile.objects.get(id=student_id)
                 
+                class_group = student.student_class.class_group
+                max_marks = exam.get_max_marks(class_group)
                 for subject_id, mark_data in subjects_marks.items():
                     subject = Subject.objects.get(id=subject_id)
                     
@@ -108,7 +111,7 @@ def save_marks_sheet(request):
                         academic_year=academic_year,
                         defaults={
                             'marks_obtained': mark_data['marks'],
-                            'max_marks': 50,
+                            'max_marks': max,
                             'is_absent': mark_data.get('is_absent', False)
                         }
                     )
