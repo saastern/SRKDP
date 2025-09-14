@@ -108,7 +108,7 @@ def save_marks_sheet(request):
                         academic_year=academic_year,
                         defaults={
                             'marks_obtained': mark_data['marks'],
-                            'max_marks': exam.max_marks,
+                            'max_marks': 50,
                             'is_absent': mark_data.get('is_absent', False)
                         }
                     )
