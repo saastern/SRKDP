@@ -6,6 +6,7 @@ from django.utils import timezone
 from datetime import datetime
 from apps.students.models import StudentProfile, Class
 from .models import AttendanceSession, AttendanceRecord
+from django.shortcuts import render, get_object_or_404
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -267,3 +268,166 @@ def get_attendance(request, class_id):
             'success': False,
             'message': f'Error fetching attendance: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+# ADD these new functions to your existing views.py
+from .services import AttendanceCalculator
+import calendar
+from datetime import datetime, timedelta
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_student_attendance_summary(request, student_id):
+    """NEW: Get student attendance summary with percentage calculation"""
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    
+    if start_date:
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+    if end_date:
+        end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+    
+    summary = AttendanceCalculator.get_student_attendance_summary(
+        student_id, start_date, end_date
+    )
+    
+    if not summary:
+        return Response({
+            'success': False,
+            'message': 'Student not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    return Response({
+        'success': True,
+        'data': {
+            'student': {
+                'id': summary['student'].id,
+                'name': summary['student'].user.get_full_name(),
+                'roll_number': summary['student'].roll_number,
+                'class': summary['student'].student_class.name
+            },
+            'period': {
+                'start_date': summary['start_date'].strftime('%Y-%m-%d'),
+                'end_date': summary['end_date'].strftime('%Y-%m-%d')
+            },
+            'statistics': {
+                'total_school_days': summary['total_school_days'],
+                'full_present_days': summary['full_present_days'],
+                'half_days': summary['half_days'],
+                'absent_days': summary['absent_days'],
+                'attendance_percentage': summary['attendance_percentage']
+            },
+            'daily_records': [
+                {
+                    'date': record['date'].strftime('%Y-%m-%d'),
+                    'status': record['status'],
+                    'morning': record['morning'],
+                    'afternoon': record['afternoon']
+                }
+                for record in summary['daily_records'].values()
+            ]
+        }
+    })
+
+# ADD Django views for HTML pages (not API)
+def attendance_dashboard(request):
+    """HTML view: Dashboard showing all classes"""
+    classes = Class.objects.all().order_by('name')
+    return render(request, 'attendance/dashboard.html', {'classes': classes})
+
+def class_students_summary(request, class_id):
+    """HTML view: Students in class with attendance percentages"""
+    class_obj = get_object_or_404(Class, id=class_id)
+    students = StudentProfile.objects.filter(student_class=class_obj).order_by('roll_number')
+    
+    # Get last 30 days summary for each student
+    student_summaries = []
+    for student in students:
+        summary = AttendanceCalculator.get_student_attendance_summary(student.id)
+        student_summaries.append({
+            'student': student,
+            'summary': summary
+        })
+    
+    return render(request, 'attendance/class_students.html', {
+        'class': class_obj,
+        'student_summaries': student_summaries
+    })
+
+def student_calendar_view(request, student_id):
+    """Individual student calendar view with safe parameter parsing"""
+    student = get_object_or_404(StudentProfile, id=student_id)
+    
+    # SAFE parsing with default values
+    def safe_int(value, default):
+        """Safely convert to int with fallback to default"""
+        try:
+            if value:  # Check if value is not empty
+                return int(value)
+            return default
+        except (ValueError, TypeError):
+            return default
+    
+    # Get month/year from request with safe defaults
+    year = safe_int(request.GET.get('year'), datetime.now().year)
+    month = safe_int(request.GET.get('month'), datetime.now().month)
+    
+    # Validate month range (1-12)
+    if not (1 <= month <= 12):
+        month = datetime.now().month
+    
+    # Calculate month date range
+    start_date = datetime(year, month, 1).date()
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+    else:
+        end_date = datetime(year, month + 1, 1).date() - timedelta(days=1)
+    
+    # Get attendance summary
+    summary = AttendanceCalculator.get_student_attendance_summary(
+        student_id, start_date, end_date
+    )
+    
+    # Create calendar matrix
+    cal = calendar.monthcalendar(year, month)
+    calendar_data = []
+    
+    for week in cal:
+        week_data = []
+        for day in week:
+            if day == 0:
+                week_data.append(None)
+            else:
+                date = datetime(year, month, day).date()
+                date_str = date.strftime('%Y-%m-%d')
+                
+                day_info = {
+                    'day': day,
+                    'date': date,
+                    'status': 'NO_SCHOOL'
+                }
+                
+                if date_str in summary['daily_records']:
+                    record = summary['daily_records'][date_str]
+                    day_info['status'] = record['status']
+                elif date.weekday() < 5:  # Weekday
+                    day_info['status'] = 'ABSENT'
+                
+                week_data.append(day_info)
+        calendar_data.append(week_data)
+    
+    # Navigation with safe URLs
+    prev_month = month - 1 if month > 1 else 12
+    prev_year = year if month > 1 else year - 1
+    next_month = month + 1 if month < 12 else 1
+    next_year = year if month < 12 else year + 1
+    
+    return render(request, 'attendance/student_calendar.html', {
+        'student': student,
+        'summary': summary,
+        'calendar_data': calendar_data,
+        'current_month': calendar.month_name[month],
+        'current_year': year,
+        'prev_month': prev_month,
+        'prev_year': prev_year,
+        'next_month': next_month,
+        'next_year': next_year
+    })

@@ -16,7 +16,9 @@ dependencies = [
     "python-dotenv (>=1.1.1,<2.0.0)",
     "dj-database-url (>=3.0.1,<4.0.0)",
     "whitenoise (>=6.9.0,<7.0.0)",
-    "gunicorn (>=21.2.0,<22.0.0)"
+    "gunicorn (>=21.2.0,<22.0.0)",
+    "pandas (>=2.3.2,<3.0.0)",
+    "celery (>=5.5.3,<6.0.0)"
 ]
 
 [build-system]

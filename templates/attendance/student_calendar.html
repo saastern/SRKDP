@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ student.user.get_full_name }} - Calendar</title>
+    <style>
+        .calendar { border-collapse: collapse; width: 100%; margin: 20px 0; }
+        .calendar th, .calendar td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        .FULL_PRESENT { background-color: #d4edda; }
+        .ABSENT { background-color: #f8d7da; }
+        .HALF_DAY { background-color: #fff3cd; }
+        .NO_SCHOOL { background-color: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <h1>{{ student.user.get_full_name }} - {{ current_month }} {{ current_year }}</h1>
+    
+    <p><strong>Attendance:</strong> {{ summary.attendance_percentage }}%</p>
+    
+    <table class="calendar">
+        <tr>
+            <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
+        </tr>
+        {% for week in calendar_data %}
+        <tr>
+            {% for day in week %}
+                {% if day %}
+                <td class="{{ day.status }}">
+                    {{ day.day }}
+                    {% if day.status == 'FULL_PRESENT' %}<br>✓
+                    {% elif day.status == 'HALF_DAY' %}<br>½
+                    {% elif day.status == 'ABSENT' %}<br>✗
+                    {% endif %}
+                </td>
+                {% else %}
+                <td></td>
+                {% endif %}
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </table>
+    
+    <div>
+        <strong>Legend:</strong>
+        <span style="background-color: #d4edda; padding: 5px;">✓ Present</span>
+        <span style="background-color: #fff3cd; padding: 5px;">½ Half Day</span>
+        <span style="background-color: #f8d7da; padding: 5px;">✗ Absent</span>
+    </div>
+    
+        <!-- templates/attendance/student_calendar.html -->
+    <div class="month-navigation">
+        <!-- Previous months -->
+        <a href="?year={{ prev_year }}&month={{ prev_month }}" class="nav-btn">← {{ prev_month }}/{{ prev_year }}</a>
+        
+        <!-- Current month display -->
+        <h2>{{ current_month }} {{ current_year }}</h2>
+        
+        <!-- Next months (if not future) -->
+        {% if not is_future_month %}
+        <a href="?year={{ next_year }}&month={{ next_month }}" class="nav-btn">{{ next_month }}/{{ next_year }} →</a>
+        {% endif %}
+    </div>
+
+    <!-- Add quick month selector -->
+    <div class="month-selector">
+        <label for="month-select">Jump to Month:</label>
+        <select id="month-select" onchange="location.href='?year='+this.value.split('-')+'&month='+this.value.split('-')[85]">
+            <option value="2025-1">January 2025</option>
+            <option value="2025-2">February 2025</option>
+            <!-- ... all months -->
+            <option value="2025-9" selected>September 2025</option>
+            <!-- ... future months -->
+        </select>
+    </div>
+
+</body>
+</html>

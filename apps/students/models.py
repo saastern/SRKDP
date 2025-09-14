@@ -2,7 +2,8 @@ from django.db import models
 from apps.users.models import User
 
 class Class(models.Model):
-    name = models.CharField(max_length=30)  # E.g. "5A", "6B"
+    name = models.CharField(max_length=30)
+    class_group  = models.CharField(max_length=10, choices=[('pre','Pre-Primary'),('1-5','Primary'),('6-10','Secondary')]) # E.g. "A", "B", etc.
     def __str__(self): return self.name
 
 class StudentProfile(models.Model):

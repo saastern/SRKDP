@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Attendance Dashboard</title>
+    <style>
+        .class-card { border: 1px solid #ddd; margin: 10px; padding: 20px; border-radius: 8px; }
+        .btn { padding: 10px 20px; background-color: #007cba; color: white; text-decoration: none; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>📊 Attendance Dashboard</h1>
+    
+    {% for class in classes %}
+    <div class="class-card">
+        <h3>{{ class.name }}</h3>
+        <p>Students: {{ class.studentprofile_set.count }}</p>
+        <a href="{% url 'class_students_summary' class.id %}" class="btn">View Attendance</a>
+    </div>
+    {% endfor %}
+</body>
+</html>

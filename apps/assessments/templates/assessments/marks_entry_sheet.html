@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Marks Entry Sheet</title>
+    <style>
+        .marks-table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .marks-table th, .marks-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        .marks-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .student-name {
+            background-color: #f9f9f9;
+            font-weight: bold;
+            text-align: left;
+        }
+        .marks-input {
+            width: 60px;
+            text-align: center;
+            border: none;
+            background: transparent;
+        }
+        .calculated {
+            background-color: #e6f3ff;
+            font-weight: bold;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        .controls select, .controls button {
+            padding: 8px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 Marks Entry Sheet</h1>
+    
+    <div class="controls">
+        <select id="classSelect">
+            <option value="">Select Class</option>
+            {% for class in classes %}
+                <option value="{{ class.id }}">{{ class.name }}</option>
+            {% endfor %}
+        </select>
+        
+        <select id="examSelect">
+            <option value="">Select Exam</option>
+            {% for exam in exams %}
+                <option value="{{ exam.id }}">{{ exam.name }} ({{ exam.max_marks }} marks)</option>
+            {% endfor %}
+        </select>
+        
+        <button onclick="loadMarksSheet()">Load Sheet</button>
+        <button onclick="saveMarks()" style="background: green; color: white;">Save Marks</button>
+    </div>
+    
+    <div id="marksSheet"></div>
+    
+    <script>
+        let currentData = null;
+        
+        function loadMarksSheet() {
+            const classId = document.getElementById('classSelect').value;
+            const examId = document.getElementById('examSelect').value;
+            
+            if (!classId || !examId) {
+                alert('Please select both class and exam');
+                return;
+            }
+            
+            fetch('/assessments/marks-sheet-data/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    class_id: classId,
+                    exam_id: examId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentData = data;
+                    renderMarksSheet(data);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            });
+        }
+        
+        function renderMarksSheet(data) {
+            let html = '<table class="marks-table">';
+            
+            // Header row
+            html += '<tr><th>Roll No.</th><th>Student Name</th>';
+            data.subjects.forEach(subject => {
+                html += `<th>${subject.name}${subject.is_main ? '' : ' (Opt)'}</th>`;
+            });
+            html += '<th class="calculated">Total</th><th class="calculated">%</th><th class="calculated">Grade</th></tr>';
+            
+            // Student rows
+            data.students.forEach(student => {
+                html += `<tr data-student-id="${student.id}">`;
+                html += `<td>${student.roll_number}</td>`;
+                html += `<td class="student-name">${student.name}</td>`;
+                
+                data.subjects.forEach(subject => {
+                    const existingMark = data.existing_marks[student.id]?.[subject.id];
+                    const value = existingMark ? existingMark.marks : '';
+                    
+                    html += `<td>
+                        <input type="number" 
+                               class="marks-input" 
+                               data-student-id="${student.id}" 
+                               data-subject-id="${subject.id}"
+                               value="${value}"
+                               min="0" 
+                               max="${data.max_marks}"
+                               onchange="calculateTotals()">
+                    </td>`;
+                });
+                
+                html += '<td class="calculated" id="total-' + student.id + '">-</td>';
+                html += '<td class="calculated" id="percent-' + student.id + '">-</td>';
+                html += '<td class="calculated" id="grade-' + student.id + '">-</td>';
+                html += '</tr>';
+            });
+            
+            html += '</table>';
+            document.getElementById('marksSheet').innerHTML = html;
+            
+            calculateTotals();
+        }
+        
+        function calculateTotals() {
+            if (!currentData) return;
+            
+            currentData.students.forEach(student => {
+                let total = 0;
+                let subjectCount = 0;
+                
+                currentData.subjects.forEach(subject => {
+                    if (subject.is_main) {  // Only count main subjects
+                        const input = document.querySelector(`input[data-student-id="${student.id}"][data-subject-id="${subject.id}"]`);
+                        const value = parseFloat(input.value) || 0;
+                        total += value;
+                        subjectCount++;
+                    }
+                });
+                
+                const maxTotal = subjectCount * currentData.max_marks;
+                const percentage = maxTotal > 0 ? (total / maxTotal * 100).toFixed(1) : 0;
+                
+                // Calculate grade
+                let grade = 'E';
+                if (percentage >= 91) grade = 'A1';
+                else if (percentage >= 81) grade = 'A2';
+                else if (percentage >= 71) grade = 'B1';
+                else if (percentage >= 61) grade = 'B2';
+                else if (percentage >= 51) grade = 'C1';
+                else if (percentage >= 41) grade = 'C2';
+                else if (percentage >= 33) grade = 'D';
+                
+                document.getElementById('total-' + student.id).textContent = total;
+                document.getElementById('percent-' + student.id).textContent = percentage + '%';
+                document.getElementById('grade-' + student.id).textContent = grade;
+            });
+        }
+        
+        function saveMarks() {
+            if (!currentData) {
+                alert('Please load marks sheet first');
+                return;
+            }
+            
+            const marks = {};
+            
+            currentData.students.forEach(student => {
+                marks[student.id] = {};
+                
+                currentData.subjects.forEach(subject => {
+                    const input = document.querySelector(`input[data-student-id="${student.id}"][data-subject-id="${subject.id}"]`);
+                    const value = parseFloat(input.value) || 0;
+                    
+                    if (value > 0) {
+                        marks[student.id][subject.id] = {
+                            marks: value,
+                            is_absent: false
+                        };
+                    }
+                });
+            });
+            
+            fetch('/assessments/save-marks-sheet/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    exam_id: document.getElementById('examSelect').value,
+                    marks: marks
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Marks saved successfully!');
+                } else {
+                    alert('❌ Error: ' + data.error);
+                }
+            });
+        }
+    </script>
+</body>
+</html>

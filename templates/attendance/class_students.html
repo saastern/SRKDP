@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ class.name }} - Students</title>
+    <style>
+        .student-card { border: 1px solid #ddd; margin: 10px; padding: 15px; }
+        .percentage { font-size: 24px; font-weight: bold; }
+        .good { color: green; }
+        .poor { color: red; }
+        .btn { padding: 8px 16px; background-color: #007cba; color: white; text-decoration: none; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>{{ class.name }} - Students Attendance</h1>
+    
+    {% for item in student_summaries %}
+    <div class="student-card">
+        <h3>{{ item.student.user.get_full_name }} ({{ item.student.roll_number }})</h3>
+        
+        {% if item.summary %}
+        <div class="percentage {% if item.summary.attendance_percentage >= 75 %}good{% else %}poor{% endif %}">
+            {{ item.summary.attendance_percentage }}%
+        </div>
+        <p>
+            Full Days: {{ item.summary.full_present_days }} | 
+            Half Days: {{ item.summary.half_days }} | 
+            Absent: {{ item.summary.absent_days }}
+        </p>
+        {% endif %}
+        
+        <a href="{% url 'student_calendar' item.student.id %}" class="btn">📅 Calendar</a>
+    </div>
+    {% endfor %}
+</body>
+</html>
