@@ -13,7 +13,7 @@ from django.shortcuts import render, get_object_or_404
 def get_class_students(request, class_id):
     """Get all students for a specific class"""
     try:
-        students = StudentProfile.objects.filter(student_class_id=class_id).select_related('user', 'student_class')
+        students = StudentProfile.objects.filter(student_class_id=class_id).select_related('user', 'student_class').order_by('roll_number')
         
         students_data = []
         for student in students:
