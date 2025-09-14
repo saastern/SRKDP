@@ -35,6 +35,7 @@ def get_marks_sheet_data(request):
             class_group = selected_class.class_group
             max_marks = selected_exam.get_max_marks(class_group)
             # Get students in this class
+            
             students = StudentProfile.objects.filter(
                 student_class=selected_class
             ).order_by('roll_number')

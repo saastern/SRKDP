@@ -75,7 +75,11 @@ class Exam(models.Model):
         # FA max marks vary by class group as per your specification
         fa_max_marks = {
             'pre': 50,     # LKG-UKG: 50 marks
-            '1-5': 25,     # Classes 1-5: 25 marks  
+            '1-2': 25, 
+            '1-5': 25,
+            '3-5': 25,
+            '6-7':  50,
+            '8-10': 50,        # Classes 1-5: 25 marks  
             '6-10': 50,    # Classes 6-10: 50 marks
         }
         return fa_max_marks.get(class_group, 50)
