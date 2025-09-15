@@ -7,7 +7,8 @@ urlpatterns = [
     path('api/attendance/report/', views.get_attendance_report, name='get_attendance_report'),
     path('api/attendance/mark/', views.mark_attendance, name='mark_attendance'),
     path('api/attendance/<int:class_id>/', views.get_attendance, name='get_attendance'),
-    
+    path('api/attendance/class/<int:class_id>/students/', views.get_class_students, name='get_class_students_alt'),
+
     # ✅ ADD THIS LINE - handles /api/attendance/class/3/ calls
     path('api/attendance/class/<int:class_id>/', views.get_attendance, name='get_attendance_class'),
     path('attendance/class/<int:class_id>/students/', views.get_class_students),
