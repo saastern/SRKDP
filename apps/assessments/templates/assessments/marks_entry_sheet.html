@@ -55,11 +55,12 @@
         <select id="examSelect">
             <option value="">Select Exam</option>
             {% for exam in exams %}
-                <option value="{{ exam.id }}">{{ exam.name }} ({{ exam.max_marks }} marks)</option>
+                <option value="{{ exam.id }}">{{ exam.name }}</option>
             {% endfor %}
         </select>
         
         <button onclick="loadMarksSheet()">Load Sheet</button>
+        <button onclick="calculateTotals()" style="background: blue; color: white;">Calculate Totals</button>
         <button onclick="saveMarks()" style="background: green; color: white;">Save Marks</button>
     </div>
     
@@ -89,16 +90,26 @@
             })
             .then(response => response.json())
             .then(data => {
+                console.log('DEBUG: Received data:', data);
                 if (data.success) {
                     currentData = data;
                     renderMarksSheet(data);
                 } else {
                     alert('Error: ' + data.error);
                 }
+            })
+            .catch(error => {
+                console.error('Error fetching marks sheet data:', error);
+                alert('An error occurred while loading the marks sheet.');
             });
         }
         
         function renderMarksSheet(data) {
+            console.log('DEBUG: Starting renderMarksSheet');
+            console.log('DEBUG: Data subjects:', data.subjects);
+            console.log('DEBUG: Data students:', data.students);
+            console.log('DEBUG: Max marks:', data.max_marks);
+            
             let html = '<table class="marks-table">';
             
             // Header row
@@ -125,8 +136,7 @@
                                data-subject-id="${subject.id}"
                                value="${value}"
                                min="0" 
-                               max="${data.max_marks}"
-                               onchange="calculateTotals()">
+                               max="${data.max_marks}">
                     </td>`;
                 });
                 
@@ -139,22 +149,40 @@
             html += '</table>';
             document.getElementById('marksSheet').innerHTML = html;
             
+            // Add event listeners for auto-calculation with debouncing
+            setTimeout(() => {
+                const inputs = document.querySelectorAll('.marks-input');
+                inputs.forEach(input => {
+                    input.addEventListener('input', function() {
+                        clearTimeout(window.calculateTimeout);
+                        window.calculateTimeout = setTimeout(() => {
+                            calculateTotals();
+                        }, 300); // Wait 300ms after user stops typing
+                    });
+                });
+            }, 100);
+            
             calculateTotals();
         }
         
         function calculateTotals() {
             if (!currentData) return;
             
+            console.log('DEBUG: Starting calculateTotals');
+            console.log('DEBUG: Max marks per subject:', currentData.max_marks);
+            
             currentData.students.forEach(student => {
                 let total = 0;
                 let subjectCount = 0;
                 
                 currentData.subjects.forEach(subject => {
-                    if (subject.is_main) {  // Only count main subjects
+                    if (subject.is_main) {
                         const input = document.querySelector(`input[data-student-id="${student.id}"][data-subject-id="${subject.id}"]`);
-                        const value = parseFloat(input.value) || 0;
-                        total += value;
-                        subjectCount++;
+                        if (input) {
+                            const value = parseFloat(input.value) || 0;
+                            total += value;
+                            subjectCount++;
+                        }
                     }
                 });
                 
@@ -171,9 +199,13 @@
                 else if (percentage >= 41) grade = 'C2';
                 else if (percentage >= 33) grade = 'D';
                 
-                document.getElementById('total-' + student.id).textContent = total;
-                document.getElementById('percent-' + student.id).textContent = percentage + '%';
-                document.getElementById('grade-' + student.id).textContent = grade;
+                const totalEl = document.getElementById('total-' + student.id);
+                const percentEl = document.getElementById('percent-' + student.id);
+                const gradeEl = document.getElementById('grade-' + student.id);
+                
+                if (totalEl) totalEl.textContent = total;
+                if (percentEl) percentEl.textContent = percentage + '%';
+                if (gradeEl) gradeEl.textContent = grade;
             });
         }
         
@@ -184,22 +216,34 @@
             }
             
             const marks = {};
+            let totalMarksEntered = 0;
             
             currentData.students.forEach(student => {
                 marks[student.id] = {};
                 
                 currentData.subjects.forEach(subject => {
                     const input = document.querySelector(`input[data-student-id="${student.id}"][data-subject-id="${subject.id}"]`);
-                    const value = parseFloat(input.value) || 0;
                     
-                    if (value > 0) {
-                        marks[student.id][subject.id] = {
-                            marks: value,
-                            is_absent: false
-                        };
+                    if (input) {
+                        const value = parseFloat(input.value) || 0;
+                        
+                        if (value > 0) {
+                            marks[student.id][subject.id] = {
+                                marks: value,
+                                is_absent: false
+                            };
+                            totalMarksEntered++;
+                        }
                     }
                 });
             });
+            
+            if (totalMarksEntered === 0) {
+                alert('Please enter some marks before saving');
+                return;
+            }
+            
+            console.log('DEBUG: Saving marks:', marks);
             
             fetch('/assessments/save-marks-sheet/', {
                 method: 'POST',
@@ -213,11 +257,16 @@
             })
             .then(response => response.json())
             .then(data => {
+                console.log('DEBUG: Save response:', data);
                 if (data.success) {
                     alert('✅ Marks saved successfully!');
                 } else {
                     alert('❌ Error: ' + data.error);
                 }
+            })
+            .catch(error => {
+                console.error('Error saving marks:', error);
+                alert('An error occurred while saving marks: ' + error.message);
             });
         }
     </script>
