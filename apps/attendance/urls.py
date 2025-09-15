@@ -10,7 +10,9 @@ urlpatterns = [
     
     # ✅ ADD THIS LINE - handles /api/attendance/class/3/ calls
     path('api/attendance/class/<int:class_id>/', views.get_attendance, name='get_attendance_class'),
-    
+    path('attendance/class/<int:class_id>/students/', views.get_class_students),
+    path('attendance/class/<int:class_id>/', views.get_attendance),
+
     # NEW: Summary API
     path('api/student/<int:student_id>/summary/', views.get_student_attendance_summary, name='student_summary'),
     
