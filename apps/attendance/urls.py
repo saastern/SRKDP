@@ -8,7 +8,7 @@ urlpatterns = [
     path('api/attendance/mark/', views.mark_attendance, name='mark_attendance'),
     path('api/attendance/<int:class_id>/', views.get_attendance, name='get_attendance'),
     path('api/attendance/class/<int:class_id>/', views.get_attendance, name='get attendance _class'), path('api/attendance/class/<int: class_id>/', views.get _attendance, name='get _attendance_class'),
-     path('api/attendance/class/<int:class_id>/students/', views.get_class_students, name='get_attendance_class_students'),
+    path('api/attendance/class/<int:class_id>/students/', views.get_class_students, name='get_attendance_class_students'),
     
     # NEW: Summary API
     # NEW: Summary API
