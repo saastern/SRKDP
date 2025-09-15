@@ -7,10 +7,11 @@ urlpatterns = [
     path('api/attendance/report/', views.get_attendance_report, name='get_attendance_report'),
     path('api/attendance/mark/', views.mark_attendance, name='mark_attendance'),
     path('api/attendance/<int:class_id>/', views.get_attendance, name='get_attendance'),
-    path('api/attendance/class/<int:class_id>/', views.get_attendance, name='get attendance _class'), path('api/attendance/class/<int: class_id>/', views.get _attendance, name='get _attendance_class'),
+    
+    # ✅ FIXED LINES - proper syntax:
+    path('api/attendance/class/<int:class_id>/', views.get_attendance, name='get_attendance_class'),
     path('api/attendance/class/<int:class_id>/students/', views.get_class_students, name='get_attendance_class_students'),
     
-    # NEW: Summary API
     # NEW: Summary API
     path('api/student/<int:student_id>/summary/', views.get_student_attendance_summary, name='student_summary'),
     
