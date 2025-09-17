@@ -76,11 +76,12 @@ def get_marks_sheet_data(request):
                     {
                         'id': s.subject.id,
                         'name': s.subject.name,
-                        'is_main': s.is_main_subject
+                        'is_main': s.is_main_subject,
+                        'max_marks': selected_exam.get_max_marks(class_group, s.subject)
                     } for s in subjects
                 ],
                 'existing_marks': existing_marks,
-                'max_marks': max_marks
+                'max_marks': selected_exam.get_max_marks(class_group)
             })
             
         except Exception as e:
@@ -98,12 +99,12 @@ def save_marks_sheet(request):
             
             for student_id, subjects_marks in data['marks'].items():
                 student = StudentProfile.objects.get(id=student_id)
-                
                 class_group = student.student_class.class_group
-                max_marks = exam.get_max_marks(class_group)
+                
                 for subject_id, mark_data in subjects_marks.items():
                     subject = Subject.objects.get(id=subject_id)
                     
+                    max_marks = exam.get_max_marks(class_group, subject)
                     # Update or create mark
                     student_mark, created = StudentMark.objects.update_or_create(
                         student=student,

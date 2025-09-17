@@ -23,11 +23,40 @@
             text-align: left;
         }
         .marks-input {
-            width: 60px;
+            width: 80px;          /* Bigger width */
+            height: 35px;         /* Added height */
             text-align: center;
-            border: none;
-            background: transparent;
+            border: 1px solid #ccc;  /* Visible border */
+            border-radius: 4px;   /* Rounded corners */
+            background: white;    /* White background */
+            font-size: 14px;      /* Larger font */
+            padding: 5px;         /* Internal padding */
         }
+        
+        /* Remove spinner arrows for number inputs */
+        .marks-input::-webkit-outer-spin-button,
+        .marks-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        /* For Firefox */
+        .marks-input[type=number] {
+            -moz-appearance: textfield;
+        }
+        
+        /* Focus state for better UX */
+        .marks-input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+        
+        /* Hover state */
+        .marks-input:hover {
+            border-color: #999;
+        }
+        
         .calculated {
             background-color: #e6f3ff;
             font-weight: bold;
@@ -108,7 +137,6 @@
             console.log('DEBUG: Starting renderMarksSheet');
             console.log('DEBUG: Data subjects:', data.subjects);
             console.log('DEBUG: Data students:', data.students);
-            console.log('DEBUG: Max marks:', data.max_marks);
             
             let html = '<table class="marks-table">';
             
@@ -136,7 +164,7 @@
                                data-subject-id="${subject.id}"
                                value="${value}"
                                min="0" 
-                               max="${data.max_marks}">
+                               max="${subject.max_marks}">
                     </td>`;
                 });
                 
@@ -169,11 +197,10 @@
             if (!currentData) return;
             
             console.log('DEBUG: Starting calculateTotals');
-            console.log('DEBUG: Max marks per subject:', currentData.max_marks);
             
             currentData.students.forEach(student => {
                 let total = 0;
-                let subjectCount = 0;
+                let maxTotal = 0;
                 
                 currentData.subjects.forEach(subject => {
                     if (subject.is_main) {
@@ -181,15 +208,16 @@
                         if (input) {
                             const value = parseFloat(input.value) || 0;
                             total += value;
-                            subjectCount++;
+                            maxTotal += subject.max_marks; // ✅ Use individual subject max_marks
                         }
                     }
                 });
                 
-                const maxTotal = subjectCount * currentData.max_marks;
                 const percentage = maxTotal > 0 ? (total / maxTotal * 100).toFixed(1) : 0;
                 
-                // Calculate grade
+                console.log(`Student ${student.name}: ${total}/${maxTotal} = ${percentage}%`);
+                
+                // Calculate grade based on percentage
                 let grade = 'E';
                 if (percentage >= 91) grade = 'A1';
                 else if (percentage >= 81) grade = 'A2';

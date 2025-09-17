@@ -1,6 +1,6 @@
 from django.test import TestCase
 from .models import *
-from ..services import GradingService
+from .services import GradingService
 from apps.students.models import StudentProfile, Class
 from apps.users.models import User
 
