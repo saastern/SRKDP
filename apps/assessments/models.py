@@ -67,7 +67,13 @@ class Exam(models.Model):
     def __str__(self):
         return self.name
     
-    def get_max_marks(self, class_group):
+    def get_max_marks(self, class_group, subject=None):
+
+        if subject and subject.name in ['Physical Science', 'Natural Science']:
+            if self.exam_type == 'SA':
+                return 50 
+            else:
+                return 25
         """Get max marks based on class group and exam type according to your spec"""
         if self.exam_type == 'SA':
             return 100  # SA is always 100 for all classes
@@ -134,6 +140,11 @@ class StudentMark(models.Model):
         super().save(*args, **kwargs)
     
     def calculate_grade(self):
+
+        "Calculate grade with special handling for certain subjects"
+        if self.subject.name in ['Physical Science', 'Natural Science']:
+            return self._calculate_combined_science_grade()
+        
         """Calculate grade based on marks and class group"""
         class_group = self.student.student_class.class_group
         
@@ -155,6 +166,42 @@ class StudentMark(models.Model):
         
         # Default to lowest grade if no match found
         return 'D2', Decimal('3.0')
+    def _calculate_combined_science_grade(self):
+        """Calculate grade for combined science subjects"""
+        try:
+
+            ps_mark = StudentMark.objects.filter(
+                student=self.student,
+                exam=self.exam,
+                academic_year=self.academic_year,
+                subject__name='Physical Science'
+            ).first()
+            ns_mark = StudentMark.objects.filter(
+                student=self.student,
+                exam=self.exam,
+                academic_year=self.academic_year,
+                subject__name='Natural Science'
+            ).first()
+            if ps_mark and ns_mark and not ps_mark.is_absent and not ns_mark.is_absent:
+                total_marks = ps_mark.marks_obtained + ns_mark.marks_obtained
+                max_total = ps_mark.max_marks + ns_mark.max_marks
+                percentage = (total_marks / max_total * 100 ) if total_marks >  0 else 0
+                
+                # Use percentage to determine grade
+                class_group = self.student.student_class.class_group
+                grade_scales = GradeScale.objects.filter(
+                    class_group=class_group,
+                    exam_type=self.exam.exam_type,
+                    min_marks__lte=percentage,
+                    max_marks__gte=percentage
+                )
+                
+                grade_scale = grade_scales.first()
+                if grade_scale:
+    
+                    return grade_scale.grade, grade_scale.grade_point
+        except Exception as e:
+            print(f"Error calculating combined science grade: {e}")
     
     def __str__(self):
         return f"{self.student.user.get_full_name()} - {self.subject.name} - {self.exam.name}: {self.marks_obtained}/{self.max_marks} ({self.grade})"
