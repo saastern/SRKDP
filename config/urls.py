@@ -27,7 +27,7 @@ urlpatterns = [
     path('health', health_check, name='health_without_slash'),  
      path('assessments/', include('apps.assessments.urls')),
     path('api/teachers/', include('apps.teachers.urls')),
-    path('api/', include('apps.assessments.urls')),
+    path('', include('apps.assessments.urls')),
     path('', include('apps.attendance.urls')),
    
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
