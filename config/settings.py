@@ -254,7 +254,7 @@ REST_FRAMEWORK = {
 # =============================================================================
 
 # CORS Origins - Development and Production
-cors_origins = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,http://192.168.1.6:3000')
+cors_origins = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:8000,http://192.168.1.6:3000')
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins.split(',')]
 
 # CORS Settings

@@ -15,6 +15,7 @@ import json
 from .models import *
 from apps.students.models import Class, StudentProfile
 
+
 @login_required
 def marks_entry_sheet(request):
     """Excel-like marks entry interface"""
@@ -28,6 +29,7 @@ def marks_entry_sheet(request):
         'academic_year': academic_year,
     }
     return render(request, 'assessments/marks_entry_sheet.html', context)
+
 
 @csrf_exempt
 def get_marks_sheet_data(request):
@@ -96,6 +98,7 @@ def get_marks_sheet_data(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
 
+
 @csrf_exempt 
 def save_marks_sheet(request):
     """Save marks from the spreadsheet"""
@@ -131,48 +134,29 @@ def save_marks_sheet(request):
             
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
+
+
+# ✅ UPDATED: Database-driven class listing
 class ClassListAPIView(APIView):
     """GET /api/assessments/classes/ - List all classes with student counts"""
-    permission_classes = [AllowAny]  # Adjust as needed
+    permission_classes = [AllowAny]
     
     def get(self, request):
         classes = Class.objects.all().order_by('name')
         
-        # Format response to match frontend expectations
         classes_data = []
         for cls in classes:
-            # Map your class names to frontend IDs
-            class_id = self.get_frontend_class_id(cls.name)
-            
             classes_data.append({
-                'id': class_id,
-                'name': class_id,
-                'displayName': cls.name,
+                'id': str(cls.id),           # ✅ Use database ID (always unique)
+                'name': cls.name,            # ✅ Use actual class name
+                'displayName': cls.name,     # ✅ Display actual name
                 'studentCount': cls.studentprofile_set.count()
             })
         
         return Response({'classes': classes_data})
-    
-    def get_frontend_class_id(self, class_name):
-        """Map Django class names to frontend format"""
-        mapping = {
-            'Nursery': 'nursery',
-            'LKG': 'lkg',
-            'UKG': 'ukg',
-            '1A': '1',
-            '2A': '2',
-            '3A': '3',
-            '4A': '4',
-            '5A': '5',
-            '6A': '6',
-            '7A': '7',
-            '8A': '8',
-            '9A': '9',
-            '10A': '10',
-            '10B': '10',
-        }
-        return mapping.get(class_name, class_name.lower())
 
+
+# ✅ UPDATED: Database-driven student listing
 class StudentListAPIView(APIView):
     """GET /api/assessments/students/?class_id=X - Get students by class"""
     permission_classes = [AllowAny]
@@ -183,9 +167,8 @@ class StudentListAPIView(APIView):
             return Response({'error': 'Class ID is required'}, status=400)
         
         try:
-            # Map frontend class_id back to Django class name
-            actual_class_name = self.get_django_class_name(class_id)
-            selected_class = Class.objects.get(name=actual_class_name)
+            # ✅ Use database ID directly (no mapping needed)
+            selected_class = Class.objects.get(id=class_id)
             
             students = StudentProfile.objects.filter(
                 student_class=selected_class
@@ -195,7 +178,7 @@ class StudentListAPIView(APIView):
             students_data = []
             for student in students:
                 students_data.append({
-                    'id': f"{class_id}-student-{student.id}",
+                    'id': str(student.id),       # ✅ Use student's actual database ID
                     'rollNo': str(student.roll_number),
                     'name': student.user.get_full_name() or f"Student {student.roll_number}",
                     'className': selected_class.name
@@ -208,126 +191,40 @@ class StudentListAPIView(APIView):
             
         except Class.DoesNotExist:
             return Response({'error': 'Class not found'}, status=404)
-    
-    def get_django_class_name(self, frontend_id):
-        """Map frontend class IDs back to Django class names"""
-        mapping = {
-            'nursery': 'Nursery',
-            'lkg': 'LKG',
-            'ukg': 'UKG',
-            '1': '1A',
-            '2': '2A',
-            '3': '3A',
-            '4': '4A',
-            '5': '5A',
-            '6': '6A',
-            '7': '7A',
-            '8': '8A',
-            '9': '9A',
-            '10': '10A',  # Default to 10A, you might want to handle multiple sections
-        }
-        return mapping.get(frontend_id, frontend_id)
 
+
+# ✅ UPDATED: Database-driven student marks
 class StudentMarksDetailAPIView(APIView):
     """GET /api/assessments/student-marks/{student_id}/ - Get REAL student marks"""
     permission_classes = [AllowAny]
     
-    
-
     def get(self, request, student_id):
         try:
-            # Parse student_id: "class-student-<identifier>"
-            parts = student_id.split('-')
-            if len(parts) != 3 or parts[1] != 'student':
-                return Response({'error': 'Invalid student ID format'}, status=400)
-
-            class_id, _, identifier = parts
-
-            # Resolve class
-            actual_class_name = self.get_django_class_name(class_id)
-            student_class = Class.objects.get(name=actual_class_name)
-
-            # Try three lookup strategies (safe & flexible)
-            student = None
-
-            # 1) If identifier is purely numeric, first try roll_number (int) then DB id
-            if identifier.isdigit():
-                # try roll_number as integer field (if you store numeric roll numbers)
-                try:
-                    student = StudentProfile.objects.get(
-                        student_class=student_class,
-                        roll_number=int(identifier)
-                    )
-                except (StudentProfile.DoesNotExist, ValueError):
-                    try:
-                        student = StudentProfile.objects.get(id=int(identifier))
-                    except StudentProfile.DoesNotExist:
-                        student = None
-
-            # 2) If not purely numeric, try direct roll_number (string)
-            if student is None:
-                try:
-                    student = StudentProfile.objects.get(
-                        student_class=student_class,
-                        roll_number=str(identifier)
-                    )
-                except StudentProfile.DoesNotExist:
-                    student = None
-
-            # 3) Last-resort: if identifier looks like "<class>-student-<dbid>" (dbid numeric)
-            if student is None:
-                # try identifier as DB id
-                try:
-                    student = StudentProfile.objects.get(id=int(identifier))
-                except Exception:
-                    student = None
-
-            if student is None:
-                return Response({'error': 'Student not found'}, status=404)
-
-            # Continue with original logic...
+            # ✅ Use student ID directly (no complex parsing needed)
+            student = StudentProfile.objects.get(id=student_id)
+            
             academic_year = AcademicYear.objects.filter(is_current=True).first()
             if not academic_year:
                 return Response({'error': 'No active academic year found'}, status=400)
 
             response_data = {
                 'student': {
-                    'id': student_id,
+                    'id': str(student.id),
                     'name': student.user.get_full_name() or f"Student {student.roll_number}",
                     'rollNo': str(student.roll_number).zfill(2) if isinstance(student.roll_number, int) or str(student.roll_number).isdigit() else str(student.roll_number),
-                    'className': student_class.name
+                    'className': student.student_class.name
                 },
                 'subjects': self.get_subjects_data(student, academic_year),
                 'termSummaries': self.get_term_summaries(student, academic_year),
-                'classConfig': self.get_class_config(student_class)
+                'classConfig': self.get_class_config(student.student_class)
             }
 
             return Response(response_data)
 
-        except (Class.DoesNotExist, StudentProfile.DoesNotExist):
+        except StudentProfile.DoesNotExist:
             return Response({'error': 'Student not found'}, status=404)
         except Exception as e:
             return Response({'error': str(e)}, status=500)
-
-    
-    def get_django_class_name(self, frontend_id):
-        """Map frontend class IDs back to Django class names"""
-        mapping = {
-            'nursery': 'Nursery',
-            'lkg': 'LKG', 
-            'ukg': 'UKG',
-            '1': '1A',
-            '2': '2A',
-            '3': '3A',
-            '4': '4A',
-            '5': '5A',
-            '6': '6A',
-            '7': '7A',
-            '8': '8A',
-            '9': '9A',
-            '10': '10A',
-        }
-        return mapping.get(frontend_id, frontend_id)
     
     def get_subjects_data(self, student, academic_year):
         """Get REAL subject marks data from database"""
@@ -477,6 +374,7 @@ class StudentMarksDetailAPIView(APIView):
                 'excludeFromTotal': ['GK', 'Computer'],
                 'gradingScale': 'higher'
             }
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
