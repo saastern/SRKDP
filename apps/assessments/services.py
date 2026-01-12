@@ -86,15 +86,20 @@ class GradingService:
     def get_grade_from_percentage(percentage, class_group, exam_type):
         """Get grade and grade point from percentage using appropriate grade scale"""
         try:
+            print(f"🔍 GRADING SERVICE START: {percentage}% class='{class_group}' exam='{exam_type}'")
             # For FA exams, convert percentage back to marks for comparison
             if exam_type == 'FA':
                 # Get max marks for this class group
-                max_marks_map = {'pre': 50, '1-5': 25, '6-10': 50}
+                max_marks_map = {'pre': 50, '1-2': 25, '3-5': 25, '6-10': 50}
                 max_marks = max_marks_map.get(class_group, 50)
                 marks = (percentage * max_marks) / 100
+                print(f"🔍 FA: max_marks={max_marks}, marks={marks} (type: {type(marks)})")
+
             else:  # SA exam
                 marks = percentage  # SA percentage directly corresponds to marks out of 100
+                print(f"🔍 SA: marks={marks}")
             
+            print(f"🔍 QUERY: class_group='{class_group}', exam_type='{exam_type}', marks={marks}")
             # Find matching grade scale
             grade_scale = GradeScale.objects.filter(
                 class_group=class_group,
@@ -103,13 +108,19 @@ class GradingService:
                 max_marks__gte=marks
             ).first()
             
+            print(f"🔍 RESULT: grade_scale={grade_scale} (type: {type(grade_scale)})")
             if grade_scale:
+                print(f"🔍 RETURNING: {grade_scale.grade}")
                 return grade_scale.grade, grade_scale.grade_point
+            else:
+                print("🔍 No matching grade scale found.")
                 
         except Exception as e:
+            print(f"🔍 EXCEPTION: {e}")
             print(f"Error getting grade from percentage: {e}")
         
         # Default fallback
+        print("🔍 FINAL FALLBACK: D2")
         return 'D2', Decimal('3.0')
     
     @staticmethod
