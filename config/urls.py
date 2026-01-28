@@ -29,7 +29,7 @@ urlpatterns = [
     path('api/teachers/', include('apps.teachers.urls')),
     path('', include('apps.assessments.urls')),
     path('', include('apps.attendance.urls')),
-   
+    path('fees/', include('apps.fees.urls')),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh')
 

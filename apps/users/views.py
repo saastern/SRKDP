@@ -54,17 +54,11 @@ def login_view(request):
             'message': 'Invalid username or password'
         }, status=status.HTTP_401_UNAUTHORIZED)
     
-    # Check if user is a teacher
-    if user.role != 'teacher':
-        logger.warning(f"Non-teacher user attempted login: {user.role}")
-        return Response({
-            'success': False,
-            'message': 'Access restricted to teachers only'
-        }, status=status.HTTP_403_FORBIDDEN)
+    # ✅ FIXED - Allow ALL roles (teacher/principal/staff)
+    logger.info(f"Login successful for user: {username} (role: {user.role})")
     
     # Generate JWT tokens
     refresh = RefreshToken.for_user(user)
-    logger.info(f"Login successful for user: {username}")
     
     return Response({
         'success': True,
@@ -78,9 +72,10 @@ def login_view(request):
             'first_name': user.first_name,
             'last_name': user.last_name,
             'full_name': user.get_full_name(),
-            'role': user.role
+            'role': user.role  # Sends principal role to frontend!
         }
     })
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
