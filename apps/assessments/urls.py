@@ -11,10 +11,13 @@ urlpatterns = [
     path('marks/enter/', api_views.enter_marks, name='enter_marks'),
     
     # Get dropdowns data
-    path('data/', api_views.get_classes_and_exams, name='classes_exams'),
-    path('marks/student/<str:student_id>/exam/<int:exam_id>/', api_views.get_student_marks, name='get_student_marks'),
-    path('marks-entry-sheet/', views.marks_entry_sheet, name='marks_entry_sheet'),
-    path('marks-sheet-data/', views.get_marks_sheet_data, name='marks_sheet_data'),
-    path('save-marks-sheet/', views.save_marks_sheet, name='save_marks_sheet'),
+    path('classes/', views.ClassListAPIView.as_view(), name='class_list'),
+    path('students/', views.StudentListAPIView.as_view(), name='student_list'),
+    path('subjects/', views.SubjectListAPIView.as_view(), name='subject_list'),
+    path('exams/', views.ExamListAPIView.as_view(), name='exam_list'),
+    path('marks/', views.save_marks_sheet, name='save_marks'),
+    path('save-sheet/', views.save_marks_sheet, name='save_sheet'),
+    path('class-results/', views.get_class_results, name='class_results'),
+    path('init-class-orders/', views.initialize_class_orders, name='init_class_orders'),
     path('', include('apps.assessments.api_urls')),
 ]

@@ -4,6 +4,8 @@ from apps.users.models import User
 class Class(models.Model):
     name = models.CharField(max_length=30)
     class_group  = models.CharField(max_length=10, choices=[('pre','Pre-Primary'),('1-5','Primary'),('6-10','Secondary')]) # E.g. "A", "B", etc.
+    order = models.IntegerField(default=0)
+    
     def __str__(self): return self.name
 
 class StudentProfile(models.Model):

@@ -8,14 +8,18 @@ from decimal import Decimal
 from calendar import month_abbr
 from .models import StudentFee, FeeStructure, FeeTransaction
 from apps.students.models import StudentProfile, Class
+from django.shortcuts import get_object_or_404
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def principal_fee_dashboard(request):
     now = timezone.now()
-    
+    # KPI Data
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
     today_collected = FeeTransaction.objects.filter(payment_date__gte=today_start).aggregate(total=Sum('amount_paid'))['total'] or 0
+    mtd_collected = FeeTransaction.objects.filter(payment_date__gte=month_start).aggregate(total=Sum('amount_paid'))['total'] or 0
     
     total_expected = FeeStructure.objects.aggregate(total=Sum('amount'))['total'] or 0
     collected = StudentFee.objects.filter(is_paid=True).aggregate(total=Sum('final_amount'))['total'] or 0
@@ -51,13 +55,14 @@ def principal_fee_dashboard(request):
 
     return Response({
         'kpis': {
+            'today_collected': float(today_collected),
+            'mtd_collected': float(mtd_collected),
             'total_expected': float(total_expected),
             'collected': float(collected),
-            'today_collected': float(today_collected),
             'pending': float(pending),
             'concessions': float(concessions),
-            'defaulters_count': defaulters,
-            'collection_rate': round(float(collected/total_expected*100), 1) if total_expected else 0
+            'defaulters': defaulters,
+            'efficiency': (collected / total_expected * 100) if total_expected > 0 else 0
         },
         'charts': {'monthly_collections': chart_data},
         'recent_transactions': [{

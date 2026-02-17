@@ -22,14 +22,16 @@ def principal_dashboard_summary(request):
     collected = StudentFee.objects.filter(is_paid=True).aggregate(total=Sum('final_amount'))['total'] or 0
     pending = total_expected - collected
     
-    # Month-to-date collection
-    mtd_collected = StudentFee.objects.filter(
-        is_paid=True, 
-        payment_date__month=today.month,
-        payment_date__year=today.year
-    ).aggregate(total=Sum('final_amount'))['total'] or 0
+    # Month-to-date collection (based on transactions for accuracy)
+    from apps.fees.models import FeeTransaction
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    mtd_collected = FeeTransaction.objects.filter(
+        payment_date__gte=month_start
+    ).aggregate(total=Sum('amount_paid'))['total'] or 0
 
-    # 2. Student & Class Stats
+    today_collected = FeeTransaction.objects.filter(
+        payment_date__date=today
+    ).aggregate(total=Sum('amount_paid'))['total'] or 0
     total_students = StudentProfile.objects.count()
     total_classes = Class.objects.count()
     

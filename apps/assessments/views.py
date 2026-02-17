@@ -146,31 +146,91 @@ def save_marks_sheet(request):
                     
                     max_marks = exam.get_max_marks(class_group, subject)
                     # Update or create mark
-                    student_mark, created = StudentMark.objects.update_or_create(
-                        student=student,
-                        subject=subject,
-                        exam=exam,
-                        academic_year=academic_year,
-                        defaults={
-                            'marks_obtained': mark_data['marks'],
-                            'max_marks': max_marks,
-                            'is_absent': mark_data.get('is_absent', False)
                         }
                     )
             
-            return JsonResponse({'success': True, 'message': 'Marks saved successfully'})
+            # Update summaries for all students in this class/exam
+            academic_year = AcademicYear.objects.filter(is_current=True).first()
+            exam = Exam.objects.get(id=data['exam_id'])
+            student_ids = data['marks'].keys()
+            
+            for s_id in student_ids:
+                student = StudentProfile.objects.get(id=s_id)
+                # Calculate summary
+                marks = StudentMark.objects.filter(student=student, exam=exam, academic_year=academic_year)
+                if marks.exists():
+                    total_obtained = sum(float(m.marks_obtained) for m in marks)
+                    total_max = sum(m.max_marks for m in marks)
+                    percentage = (total_obtained / total_max * 100) if total_max > 0 else 0
+                    
+                    StudentExamSummary.objects.update_or_create(
+                        student=student,
+                        exam=exam,
+                        academic_year=academic_year,
+                        defaults={
+                            'total_marks_obtained': total_obtained,
+                            'total_max_marks': total_max,
+                            'percentage': percentage,
+                            'subjects_count': marks.count()
+                        }
+                    )
+
+            return JsonResponse({'success': True, 'message': 'Marks saved and summaries updated successfully'})
             
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
 
 
 # ✅ UPDATED: Database-driven class listing
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_class_results(request):
+    """Get exam results for all students in a class"""
+    class_id = request.query_params.get('class_id')
+    exam_id = request.query_params.get('exam_id')
+    
+    if not class_id or not exam_id:
+        return Response({'error': 'class_id and exam_id required'}, status=400)
+        
+    summaries = StudentExamSummary.objects.filter(
+        student__student_class_id=class_id,
+        exam_id=exam_id
+    ).select_related('student')
+    
+    results = []
+    for s in summaries:
+        results.append({
+            'studentName': s.student.name,
+            'rollNo': s.student.roll_number,
+            'totalObtained': s.total_marks_obtained,
+            'totalMax': s.total_max_marks,
+            'percentage': s.percentage,
+            'subjectCount': s.subjects_count
+        })
+        
+    return Response({'results': results})
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def initialize_class_orders(request):
+    """Utility to set default class orders: Nursery=1, LKG=2, UKG=3, 1st=4..."""
+    order_map = {
+        'Nursery': 1, 'LKG': 2, 'UKG': 3,
+        '1st': 4, '2nd': 5, '3rd': 6, '4th': 7, '5th': 8,
+        '6th': 9, '7th': 10, '8th': 11, '9th': 12, '10th': 13
+    }
+    updated = 0
+    for name, order in order_map.items():
+        count = Class.objects.filter(name__icontains=name).update(order=order)
+        updated += count
+    return Response({'success': True, 'updated': updated})
+
 class ClassListAPIView(APIView):
     """GET /api/assessments/classes/ - List all classes with student counts"""
     permission_classes = [AllowAny]
     
     def get(self, request):
-        classes = Class.objects.all().order_by('name')
+        classes = Class.objects.all().order_by('order', 'name')
         
         classes_data = []
         for cls in classes:
