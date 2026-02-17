@@ -15,7 +15,7 @@ def principal_dashboard_summary(request):
     Consolidated metrics for the Principal Dashboard
     """
     now = timezone.now()
-    today = now.date()
+    today = timezone.localtime(now).date()  # Use local time (IST) not UTC
     
     # 1. Fees Stats
     total_expected = StudentFee.objects.aggregate(total=Sum('final_amount'))['total'] or 0
@@ -24,26 +24,26 @@ def principal_dashboard_summary(request):
     
     # Month-to-date collection (based on transactions for accuracy)
     from apps.fees.models import FeeTransaction
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_start = today.replace(day=1)
     mtd_collected = FeeTransaction.objects.filter(
-        payment_date__gte=month_start
+        payment_date__date__gte=month_start
     ).aggregate(total=Sum('amount_paid'))['total'] or 0
 
+    # Today's collection from FeeTransaction (the actual payments table)
     today_collected = FeeTransaction.objects.filter(
         payment_date__date=today
     ).aggregate(total=Sum('amount_paid'))['total'] or 0
     total_students = StudentProfile.objects.count()
     total_classes = Class.objects.count()
     
-    # NEW: Staff Stats
+    # Staff Stats
     from apps.teachers.models import TeacherProfile
     total_teachers = TeacherProfile.objects.count()
     
     # 3. Attendance Stats (Today)
-    # Find sessions for today (morning preferred if multiple)
     today_sessions = AttendanceSession.objects.filter(date=today)
     total_present_today = 0
-    total_strength_today = total_students # fallback to total strength
+    total_strength_today = total_students
     
     if today_sessions.exists():
         records = AttendanceRecord.objects.filter(session__in=today_sessions)
@@ -55,12 +55,6 @@ def principal_dashboard_summary(request):
     
     # 4. Academic Stats
     avg_pass_rate = StudentExamSummary.objects.aggregate(avg_pct=Avg('percentage'))['avg_pct'] or 0
-    
-    # 5. Today's Fee Collection (for Today's Summary card)
-    today_collected = StudentFee.objects.filter(
-        is_paid=True,
-        payment_date__date=today
-    ).aggregate(total=Sum('final_amount'))['total'] or 0
 
     return Response({
         'success': True,
