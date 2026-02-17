@@ -5,7 +5,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from .models import *
-from django.db.models import Sum, Avg, Count, Q
+from django.db.models import Sum, Avg, Count, Q, IntegerField
+from django.db.models.functions import Cast
 from .serializers import *
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
@@ -301,7 +302,9 @@ class StudentListAPIView(APIView):
             
             students = StudentProfile.objects.filter(
                 student_class=selected_class
-            ).order_by('roll_number')
+            ).annotate(
+                roll_int=Cast('roll_number', output_field=IntegerField())
+            ).order_by('roll_int')
             
             # Format students data
             students_data = []

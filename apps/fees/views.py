@@ -14,64 +14,56 @@ from django.shortcuts import get_object_or_404
 @permission_classes([IsAuthenticated])
 def principal_fee_dashboard(request):
     now = timezone.now()
-    # KPI Data
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    today = timezone.localtime(now).date()
+    month_start = today.replace(day=1)
     
-    today_collected = FeeTransaction.objects.filter(payment_date__gte=today_start).aggregate(total=Sum('amount_paid'))['total'] or 0
+    today_collected = FeeTransaction.objects.filter(payment_date__date=today).aggregate(total=Sum('amount_paid'))['total'] or 0
     mtd_collected = FeeTransaction.objects.filter(payment_date__gte=month_start).aggregate(total=Sum('amount_paid'))['total'] or 0
     
     total_expected = FeeStructure.objects.aggregate(total=Sum('amount'))['total'] or 0
-    collected = StudentFee.objects.filter(is_paid=True).aggregate(total=Sum('final_amount'))['total'] or 0
-    pending = StudentFee.objects.filter(is_paid=False, final_amount__gt=0).aggregate(total=Sum('final_amount'))['total'] or 0
+    collected = FeeTransaction.objects.aggregate(total=Sum('amount_paid'))['total'] or 0
+    pending = total_expected - collected
     concessions = StudentFee.objects.filter(concession_amount__gt=0).aggregate(total=Sum('concession_amount'))['total'] or 0
-    defaulters = StudentFee.objects.filter(is_paid=False, final_amount__gt=0).values('student').distinct().count()
+    defaulters = StudentFee.objects.filter(balance_amount__gt=0).values('student').distinct().count()
     
     # Monthly Chart Data (Last 6 months)
     chart_data = []
     for i in range(6):
-        month_ago = now - timedelta(days=30*i)
-        month_collected = StudentFee.objects.filter(
-            payment_date__month=month_ago.month,
-            payment_date__year=month_ago.year,
-            is_paid=True
-        ).aggregate(total=Sum('final_amount'))['total'] or 0
+        # Calculate month start for chart
+        m_start = (month_start - timedelta(days=30*i)).replace(day=1)
+        m_end = (m_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
         
-        chart_data.append({
-            'month': month_abbr[month_ago.month],
+        month_collected = FeeTransaction.objects.filter(
+            payment_date__date__gte=m_start,
+            payment_date__date__lte=m_end
+        ).aggregate(total=Sum('amount_paid'))['total'] or 0
+        
+        chart_data.insert(0, {
+            'month': month_abbr[m_start.month],
             'amount': float(month_collected)
         })
     
-    # Recent Transactions - use .only() to skip missing columns
-    recent = StudentFee.objects.filter(is_paid=True).select_related('student__user').only(
-        'id', 'student', 'is_paid', 'final_amount', 'payment_date', 
-        'receipt_number', 'amount_due', 'concession_amount'
-    )[:10]
+    # Recent Transactions - now using FeeTransaction for better accuracy
+    recent = FeeTransaction.objects.select_related('student_fee__student__user').order_by('-payment_date')[:15]
     
-    # Robust transaction mapping
-    def get_fee_amount(fee):
-        # Fallback to amount_due or final_amount if other fields fail
-        return getattr(fee, 'total_amount', getattr(fee, 'final_amount', fee.amount_due))
-
     return Response({
         'kpis': {
             'today_collected': float(today_collected),
             'mtd_collected': float(mtd_collected),
             'total_expected': float(total_expected),
             'collected': float(collected),
-            'pending': float(pending),
+            'pending': float(pending) if pending > 0 else 0,
             'concessions': float(concessions),
-            'defaulters': defaulters,
-            'efficiency': (collected / total_expected * 100) if total_expected > 0 else 0
+            'defaulters_count': defaulters,
+            'collection_rate': round((float(collected) / float(total_expected) * 100), 1) if total_expected > 0 else 0
         },
         'charts': {'monthly_collections': chart_data},
         'recent_transactions': [{
-            'student': f"{fee.student.user.get_full_name()} ({fee.student.roll_number})",
-            'amount': float(get_fee_amount(fee)),
-            'concession': float(fee.concession_amount),
-            'date': fee.payment_date.strftime('%Y-%m-%d %H:%M') if fee.payment_date else '',
-            'receipt': fee.receipt_number
-        } for fee in recent]
+            'student': f"{t.student_fee.student.user.get_full_name()} ({t.student_fee.student.roll_number})",
+            'amount': float(t.amount_paid),
+            'date': t.payment_date.strftime('%Y-%m-%d %H:%M'),
+            'receipt': t.receipt_number
+        } for t in recent]
     })
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -232,6 +224,10 @@ def list_transactions(request):
     List transactions with filters for date, method and student.
     """
     date_str = request.query_params.get('date')
+    if not date_str:
+        # Default to today in local time
+        date_str = timezone.localtime(timezone.now()).date().strftime('%Y-%m-%d')
+        
     method = request.query_params.get('method')
     student_id = request.query_params.get('student_id')
     
