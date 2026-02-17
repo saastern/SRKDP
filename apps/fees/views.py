@@ -13,11 +13,34 @@ from django.shortcuts import get_object_or_404
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def principal_fee_dashboard(request):
+    import logging
+    logger = logging.getLogger('apps.fees')
+    
     now = timezone.now()
     today = timezone.localtime(now).date()
     month_start = today.replace(day=1)
     
+    # Debug logging
+    logger.info(f"🕐 Server UTC time: {now}")
+    logger.info(f"🕐 Local time: {timezone.localtime(now)}")
+    logger.info(f"📅 Today's date (local): {today}")
+    logger.info(f"📅 Month start: {month_start}")
+    
+    # Check all transactions
+    all_transactions = FeeTransaction.objects.all()
+    logger.info(f"💰 Total transactions in DB: {all_transactions.count()}")
+    
+    # Log recent transactions with their dates
+    recent_txns = FeeTransaction.objects.order_by('-payment_date')[:5]
+    for txn in recent_txns:
+        logger.info(f"  - Transaction: ₹{txn.amount_paid} on {txn.payment_date} (local: {timezone.localtime(txn.payment_date)})")
+    
     today_collected = FeeTransaction.objects.filter(payment_date__date=today).aggregate(total=Sum('amount_paid'))['total'] or 0
+    today_count = FeeTransaction.objects.filter(payment_date__date=today).count()
+    
+    logger.info(f"💵 Today's collection query: payment_date__date={today}")
+    logger.info(f"💵 Today's collection: ₹{today_collected} ({today_count} transactions)")
+    
     mtd_collected = FeeTransaction.objects.filter(payment_date__gte=month_start).aggregate(total=Sum('amount_paid'))['total'] or 0
     
     total_expected = FeeStructure.objects.aggregate(total=Sum('amount'))['total'] or 0
