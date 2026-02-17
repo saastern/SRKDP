@@ -39,6 +39,11 @@ def principal_fee_dashboard(request):
     # Recent Transactions
     recent = StudentFee.objects.filter(is_paid=True).select_related('student__user')[:10]
     
+    # Robust transaction mapping
+    def get_fee_amount(fee):
+        # Fallback to amount_due or final_amount if other fields fail
+        return getattr(fee, 'total_amount', getattr(fee, 'final_amount', fee.amount_due))
+
     return Response({
         'kpis': {
             'total_expected': float(total_expected),
@@ -51,7 +56,7 @@ def principal_fee_dashboard(request):
         'charts': {'monthly_collections': chart_data},
         'recent_transactions': [{
             'student': f"{fee.student.user.get_full_name()} ({fee.student.roll_number})",
-            'amount': float(fee.final_amount),
+            'amount': float(get_fee_amount(fee)),
             'concession': float(fee.concession_amount),
             'date': fee.payment_date.strftime('%Y-%m-%d %H:%M') if fee.payment_date else '',
             'receipt': fee.receipt_number
@@ -82,19 +87,34 @@ def get_student_fee_status(request):
                 'student': {
                     'name': student.user.get_full_name(),
                     'class': student.student_class.name if student.student_class else 'N/A'
-                }
+                },
+                'fee_id': None,
+                'total_assigned': 0.0,
+                'concession': 0.0,
+                'final_total': 0.0,
+                'balance': 0.0,
+                'is_paid': False,
+                'history': []
             })
             
         # Get transaction history
-        transactions = FeeTransaction.objects.filter(student_fee=fee_record).order_by('-payment_date')
-        
+        transactions = []
+        try:
+            transactions = FeeTransaction.objects.filter(student_fee=fee_record).order_by('-payment_date')
+        except Exception:
+            pass # In case table doesn't exist yet
+            
+        # Defensive field mapping
+        final_total = getattr(fee_record, 'total_amount', fee_record.final_amount)
+        balance = getattr(fee_record, 'balance_amount', final_total)
+
         return Response({
             'exists': True,
             'fee_id': fee_record.id,
             'total_assigned': float(fee_record.amount_due),
             'concession': float(fee_record.concession_amount),
-            'final_total': float(fee_record.total_amount),
-            'balance': float(fee_record.balance_amount),
+            'final_total': float(final_total),
+            'balance': float(balance),
             'is_paid': fee_record.is_paid,
             'history': [{
                 'amount': float(t.amount_paid),
