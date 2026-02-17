@@ -23,19 +23,16 @@ urlpatterns = [
     path('', home_view, name='home'),
 
     path('api/auth/', include('apps.users.urls')),
-    path('health/', health_check, name='health_with_slash'),
-    path('health', health_check, name='health_without_slash'),  
-     path('assessments/', include('apps.assessments.urls')),
     path('api/teachers/', include('apps.teachers.urls')),
     path('api/dashboard/', include('apps.dashboard.urls')),
     path('api/students/', include('apps.students.urls')),
     path('api/fees/', include('apps.fees.urls')),
-    path('', include('apps.assessments.urls')),
-    path('', include('apps.attendance.urls')),
-    path('fees/', include('apps.fees.urls')),
+    path('api/assessments/', include('apps.assessments.urls')),
+    path('api/attendance/', include('apps.attendance.urls')),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh')
-
-
-]  
-
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    
+    # Utilities
+    path('health/', health_check, name='health_with_slash'),
+    path('health', health_check, name='health_without_slash'),
+]
