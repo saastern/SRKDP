@@ -82,6 +82,7 @@ def principal_fee_dashboard(request):
         },
         'charts': {'monthly_collections': chart_data},
         'recent_transactions': [{
+            'id': t.id,
             'student': f"{t.student_fee.student.user.get_full_name()} ({t.student_fee.student.roll_number})",
             'amount': float(t.amount_paid),
             'date': t.payment_date.strftime('%Y-%m-%d %H:%M'),
