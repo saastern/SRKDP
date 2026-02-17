@@ -85,6 +85,7 @@ def principal_fee_dashboard(request):
             'id': t.id,
             'student': f"{t.student_fee.student.user.get_full_name()} ({t.student_fee.student.roll_number})",
             'amount': float(t.amount_paid),
+            'method': t.payment_method,
             'date': t.payment_date.strftime('%Y-%m-%d %H:%M'),
             'receipt': t.receipt_number
         } for t in recent]
