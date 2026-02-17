@@ -259,3 +259,29 @@ def list_transactions(request):
             'notes': t.notes
         } for t in transactions]
     })
+
+@api_view(['DELETE', 'POST'])
+@permission_classes([IsAuthenticated])
+def delete_transaction(request, tx_id):
+    """
+    Delete a transaction and revert the student's fee balance.
+    """
+    try:
+        transaction = get_object_or_404(FeeTransaction, id=tx_id)
+        fee_record = transaction.student_fee
+        
+        # Revert the balance
+        fee_record.balance_amount += transaction.amount_paid
+        # Reset is_paid if it was fully paid (defensive)
+        fee_record.is_paid = False
+        fee_record.save()
+        
+        # Log the deletion for audit if needed, here we just delete
+        transaction.delete()
+        
+        return Response({
+            'success': True, 
+            'message': 'Transaction deleted successfully and balance reverted.'
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
