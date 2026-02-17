@@ -105,6 +105,8 @@ def get_student_fee_status(request):
         })
     except StudentProfile.DoesNotExist:
         return Response({'error': 'Student not found'}, status=404)
+    except Exception as e:
+        return Response({'exists': False, 'error': str(e)}, status=500)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
