@@ -36,8 +36,11 @@ def principal_fee_dashboard(request):
             'amount': float(month_collected)
         })
     
-    # Recent Transactions
-    recent = StudentFee.objects.filter(is_paid=True).select_related('student__user')[:10]
+    # Recent Transactions - use .only() to skip missing columns
+    recent = StudentFee.objects.filter(is_paid=True).select_related('student__user').only(
+        'id', 'student', 'is_paid', 'final_amount', 'payment_date', 
+        'receipt_number', 'amount_due', 'concession_amount'
+    )[:10]
     
     # Robust transaction mapping
     def get_fee_amount(fee):
@@ -75,10 +78,15 @@ def get_student_fee_status(request):
         now = timezone.now()
         month_str = now.strftime('%b-%Y')
         
-        # Check for existing fee record for current month
+        # Check for existing fee record for current month - use .only() to skip missing columns
         fee_record = StudentFee.objects.filter(
             student=student, 
             fee_structure__fee_month=month_str
+        ).only(
+            'id', 'student', 'fee_structure', 'amount_due', 
+            'concession_amount', 'final_amount', 'is_paid', 
+            'payment_date', 'payment_method', 'receipt_number', 
+            'notes', 'created_at'
         ).first()
         
         if not fee_record:
