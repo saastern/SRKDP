@@ -1,5 +1,5 @@
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django.utils import timezone
 from django.db.models import Sum, Count, Q
@@ -58,8 +58,9 @@ def principal_fee_dashboard(request):
         } for fee in recent]
     })
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def get_student_fee_status(request):
+    print(f"DEBUG: get_student_fee_status hit with student_id={request.query_params.get('student_id')}")
     student_id = request.query_params.get('student_id')
     if not student_id:
         return Response({'error': 'Student ID required'}, status=400)
