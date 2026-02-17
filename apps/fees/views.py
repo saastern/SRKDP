@@ -14,7 +14,9 @@ from apps.students.models import StudentProfile, Class
 def principal_fee_dashboard(request):
     now = timezone.now()
     
-    # KPI Data
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_collected = FeeTransaction.objects.filter(payment_date__gte=today_start).aggregate(total=Sum('amount_paid'))['total'] or 0
+    
     total_expected = FeeStructure.objects.aggregate(total=Sum('amount'))['total'] or 0
     collected = StudentFee.objects.filter(is_paid=True).aggregate(total=Sum('final_amount'))['total'] or 0
     pending = StudentFee.objects.filter(is_paid=False, final_amount__gt=0).aggregate(total=Sum('final_amount'))['total'] or 0
@@ -51,6 +53,7 @@ def principal_fee_dashboard(request):
         'kpis': {
             'total_expected': float(total_expected),
             'collected': float(collected),
+            'today_collected': float(today_collected),
             'pending': float(pending),
             'concessions': float(concessions),
             'defaulters_count': defaulters,
@@ -216,3 +219,38 @@ def record_payment(request):
         return Response({'error': 'Student not found'}, status=404)
     except Exception as e:
         return Response({'success': False, 'message': str(e)}, status=400)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_transactions(request):
+    """
+    List transactions with filters for date, method and student.
+    """
+    date_str = request.query_params.get('date')
+    method = request.query_params.get('method')
+    student_id = request.query_params.get('student_id')
+    
+    queryset = FeeTransaction.objects.select_related('student_fee__student__user', 'recorded_by').all()
+    
+    if date_str:
+        queryset = queryset.filter(payment_date__date=date_str)
+    if method:
+        queryset = queryset.filter(payment_method=method)
+    if student_id:
+        queryset = queryset.filter(student_fee__student_id=student_id)
+        
+    transactions = queryset.order_by('-payment_date')[:50] # Limit to last 50 for now
+    
+    return Response({
+        'transactions': [{
+            'id': t.id,
+            'student_name': t.student_fee.student.user.get_full_name(),
+            'roll_number': t.student_fee.student.roll_number,
+            'amount': float(t.amount_paid),
+            'method': t.payment_method,
+            'date': t.payment_date.strftime('%Y-%m-%d %H:%M'),
+            'receipt': t.receipt_number,
+            'recorded_by': t.recorded_by.username if t.recorded_by else 'System',
+            'notes': t.notes
+        } for t in transactions]
+    })
