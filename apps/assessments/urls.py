@@ -16,7 +16,6 @@ urlpatterns = [
     path('subjects/', views.SubjectListAPIView.as_view(), name='subject_list'),
     path('exams/', views.ExamListAPIView.as_view(), name='exam_list'),
     path('marks/', views.save_marks_sheet, name='save_marks'),
-    path('save-sheet/', views.save_marks_sheet, name='save_sheet'),
     path('class-results/', views.get_class_results, name='class_results'),
     path('init-class-orders/', views.initialize_class_orders, name='init_class_orders'),
     path('', include('apps.assessments.api_urls')),

@@ -254,6 +254,37 @@ class ClassListAPIView(APIView):
         return Response({'classes': classes_data})
 
 
+class ExamListAPIView(APIView):
+    """GET /api/assessments/exams/ - List all exams"""
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        exams = Exam.objects.all().order_by('order')
+        return Response({
+            'exams': [{
+                'id': e.id,
+                'name': e.name,
+                'type': e.exam_type,
+                'order': e.order
+            } for e in exams]
+        })
+
+
+class SubjectListAPIView(APIView):
+    """GET /api/assessments/subjects/ - List all subjects"""
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        subjects = Subject.objects.all().order_by('name')
+        return Response({
+            'subjects': [{
+                'id': s.id,
+                'name': s.name,
+                'code': s.code
+            } for s in subjects]
+        })
+
+
 # ✅ UPDATED: Database-driven student listing
 class StudentListAPIView(APIView):
     """GET /api/assessments/students/?class_id=X - Get students by class"""
