@@ -27,6 +27,7 @@ urlpatterns = [
     path('health', health_check, name='health_without_slash'),  
      path('assessments/', include('apps.assessments.urls')),
     path('api/teachers/', include('apps.teachers.urls')),
+    path('api/dashboard/', include('apps.dashboard.urls')),
     path('', include('apps.assessments.urls')),
     path('', include('apps.attendance.urls')),
     path('fees/', include('apps.fees.urls')),
