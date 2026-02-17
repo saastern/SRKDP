@@ -14,6 +14,7 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 from .models import *
 from apps.students.models import Class, StudentProfile
+from decimal import Decimal
 
 
 @login_required
@@ -146,6 +147,15 @@ def save_marks_sheet(request):
                     
                     max_marks = exam.get_max_marks(class_group, subject)
                     # Update or create mark
+                    StudentMark.objects.update_or_create(
+                        student=student,
+                        exam=exam,
+                        subject=subject,
+                        academic_year=academic_year,
+                        defaults={
+                            'marks_obtained': Decimal(str(mark_data)) if mark_data else 0,
+                            'max_marks': max_marks,
+                            'recorded_by': request.user if request.user.is_authenticated else None
                         }
                     )
             
