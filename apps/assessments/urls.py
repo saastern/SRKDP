@@ -4,6 +4,11 @@ from . import views
 from django.urls import include
 
 urlpatterns = [
+    # Marks entry sheet (Django template-based Excel-like UI)
+    path('marks-entry-sheet/', views.marks_entry_sheet, name='marks_entry_sheet'),
+    path('marks-sheet-data/', views.get_marks_sheet_data, name='marks_sheet_data'),
+    path('save-marks-sheet/', views.save_marks_sheet, name='save_marks'),
+
     # Get form data
     path('marks/form-data/', api_views.get_marks_entry_form_data, name='marks_form_data'),
     

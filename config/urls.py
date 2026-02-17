@@ -28,6 +28,7 @@ urlpatterns = [
     path('api/students/', include('apps.students.urls')),
     path('api/fees/', include('apps.fees.urls')),
     path('api/assessments/', include('apps.assessments.urls')),
+    path('assessments/', include('apps.assessments.urls')),  # Django template views
     path('api/attendance/', include('apps.attendance.urls')),
     path('api/notifications/', include('apps.notifications.urls')),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
