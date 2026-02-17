@@ -45,17 +45,45 @@ def get_marks_sheet_data(request):
             selected_exam = Exam.objects.get(id=exam_id)
             class_group = selected_class.class_group
             max_marks = selected_exam.get_max_marks(class_group)
-            # Get students in this class
+            # Get students in this class - sort numerically by roll_number
+            from django.db.models.functions import Cast
+            from django.db.models import IntegerField
             
             students = StudentProfile.objects.filter(
                 student_class=selected_class
-            ).order_by('roll_number')
+            ).annotate(
+                roll_int=Cast('roll_number', IntegerField())
+            ).order_by('roll_int')
             
             # Get subjects for this class
-            subjects = ClassSubjectMapping.objects.filter(
+            subjects_list = ClassSubjectMapping.objects.filter(
                 student_class=selected_class,
                 academic_year=academic_year
-            ).select_related('subject').order_by('is_main_subject', 'subject__name')
+            ).select_related('subject')
+            
+            # Custom sorting for subjects
+            subject_order = {
+                'Telugu': 1,
+                'Hindi': 2,
+                'English': 3,
+                'Mathematics': 4,
+                'Maths': 4,
+                'Physical Science': 5,
+                'Natural Science': 6,
+                'Science': 5,
+                'Social Studies': 7,
+                'Social': 7
+            }
+            
+            def get_subject_priority(mapping):
+                name = mapping.subject.name
+                # Try to find exact match or partial match
+                for key, priority in subject_order.items():
+                    if key.lower() in name.lower():
+                        return priority
+                return 100 # Default priority for other subjects
+            
+            subjects = sorted(subjects_list, key=get_subject_priority)
             
             # Get existing marks
             existing_marks = {}
