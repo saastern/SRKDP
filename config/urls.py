@@ -28,6 +28,8 @@ urlpatterns = [
      path('assessments/', include('apps.assessments.urls')),
     path('api/teachers/', include('apps.teachers.urls')),
     path('api/dashboard/', include('apps.dashboard.urls')),
+    path('api/students/', include('apps.students.urls')),
+    path('api/fees/', include('apps.fees.urls')),
     path('', include('apps.assessments.urls')),
     path('', include('apps.attendance.urls')),
     path('fees/', include('apps.fees.urls')),

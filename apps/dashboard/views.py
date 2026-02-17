@@ -33,18 +33,21 @@ def principal_dashboard_summary(request):
     total_students = StudentProfile.objects.count()
     total_classes = Class.objects.count()
     
+    # NEW: Staff Stats
+    from apps.teachers.models import TeacherProfile
+    total_teachers = TeacherProfile.objects.count()
+    
     # 3. Attendance Stats (Today)
     # Find sessions for today (morning preferred if multiple)
     today_sessions = AttendanceSession.objects.filter(date=today)
     total_present_today = 0
-    total_strength_today = 0
+    total_strength_today = total_students # fallback to total strength
     
     if today_sessions.exists():
-        # Using a simplified approach: count records across all sessions today
-        # Note: This might double count if a student is in both sessions, but usually session is per class
         records = AttendanceRecord.objects.filter(session__in=today_sessions)
-        total_strength_today = records.count()
-        total_present_today = records.filter(is_present=True).count()
+        if records.exists():
+            total_strength_today = records.values('student').distinct().count()
+            total_present_today = records.filter(is_present=True).values('student').distinct().count()
         
     attendance_rate = (total_present_today / total_strength_today * 100) if total_strength_today > 0 else 0
     
@@ -71,8 +74,9 @@ def principal_dashboard_summary(request):
             'students': {
                 'total_count': total_students,
                 'total_classes': total_classes,
+                'total_teachers': total_teachers,
                 'present_today': total_present_today,
-                'strength_today': total_strength_today if total_strength_today > 0 else total_students,
+                'strength_today': total_strength_today,
                 'attendance_rate': round(attendance_rate, 1)
             },
             'academics': {

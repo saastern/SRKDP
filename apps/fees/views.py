@@ -6,6 +6,7 @@ from django.db.models import Sum, Count, Q
 from datetime import timedelta
 from calendar import month_abbr
 from .models import StudentFee, FeeStructure
+from apps.students.models import StudentProfile
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -55,3 +56,54 @@ def principal_fee_dashboard(request):
             'receipt': fee.receipt_number
         } for fee in recent]
     })
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def record_payment(request):
+    data = request.data
+    student_id = data.get('student_id')
+    amount_paid = data.get('amount_paid')
+    concession = data.get('concession', 0)
+    payment_method = data.get('payment_method', 'CASH')
+    receipt_no = data.get('receipt_no')
+    notes = data.get('notes', '')
+
+    try:
+        student = StudentProfile.objects.get(id=student_id)
+        # Find or create a fee structure for this student's class group and current month
+        now = timezone.now()
+        month_str = now.strftime('%b-%Y') # e.g. "Jan-2026"
+        
+        # Determine class group (this is a bit simplified, usually mapping class to group)
+        class_group = student.student_class.class_group if student.student_class else '1-10'
+        
+        structure, _ = FeeStructure.objects.get_or_create(
+            class_group=class_group,
+            fee_month=month_str,
+            defaults={'amount': amount_paid + concession, 'due_date': now.date()}
+        )
+        
+        fee_record = StudentFee.objects.create(
+            student=student,
+            fee_structure=structure,
+            amount_due=amount_paid + concession,
+            concession_amount=concession,
+            is_paid=True,
+            payment_date=now,
+            payment_method=payment_method,
+            receipt_number=receipt_no,
+            notes=notes
+        )
+        
+        return Response({
+            'success': True, 
+            'message': 'Payment recorded successfully',
+            'payment': {
+                'id': fee_record.id,
+                'receipt_no': fee_record.receipt_number,
+                'amount': float(fee_record.final_amount)
+            }
+        })
+    except StudentProfile.DoesNotExist:
+        return Response({'success': False, 'message': 'Student not found'}, status=404)
+    except Exception as e:
+        return Response({'success': False, 'message': str(e)}, status=400)

@@ -25,3 +25,22 @@ def teacher_dashboard(request):
 
     serializer = TeacherDashboardSerializer(request.user)
     return Response({"success": True, "teacher": serializer.data})
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_teachers(request):
+    """List all teachers for Principal view"""
+    # Only principals and admins can see the full staff list
+    if request.user.role not in ['principal', 'admin']:
+        return Response({'error': 'Unauthorized'}, status=403)
+        
+    teachers = TeacherProfile.objects.all().select_related('user')
+    results = []
+    for t in teachers:
+        results.append({
+            'id': t.id,
+            'name': t.user.get_full_name() or t.user.username,
+            'email': t.user.email,
+            'subjects': t.subjects,
+            'role': 'Faculty'
+        })
+    return Response({'success': True, 'staff': results})
