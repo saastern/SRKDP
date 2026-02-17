@@ -49,7 +49,7 @@ def principal_dashboard_summary(request):
     attendance_rate = (total_present_today / total_strength_today * 100) if total_strength_today > 0 else 0
     
     # 4. Academic Stats
-    avg_pass_rate = StudentExamSummary.objects.aggregate(avg_pct=Avg('percentage'))['avg_pct'] or 90 # fallback to 90
+    avg_pass_rate = StudentExamSummary.objects.aggregate(avg_pct=Avg('percentage'))['avg_pct'] or 0
     
     # 5. Today's Fee Collection (for Today's Summary card)
     today_collected = StudentFee.objects.filter(
@@ -72,7 +72,7 @@ def principal_dashboard_summary(request):
                 'total_count': total_students,
                 'total_classes': total_classes,
                 'present_today': total_present_today,
-                'strength_today': total_strength_today,
+                'strength_today': total_strength_today if total_strength_today > 0 else total_students,
                 'attendance_rate': round(attendance_rate, 1)
             },
             'academics': {
