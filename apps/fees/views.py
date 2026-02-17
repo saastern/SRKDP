@@ -4,9 +4,10 @@ from rest_framework.response import Response
 from django.utils import timezone
 from django.db.models import Sum, Count, Q
 from datetime import timedelta
+from decimal import Decimal
 from calendar import month_abbr
-from .models import StudentFee, FeeStructure
-from apps.students.models import StudentProfile
+from .models import StudentFee, FeeStructure, FeeTransaction
+from apps.students.models import StudentProfile, Class
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -45,7 +46,7 @@ def principal_fee_dashboard(request):
             'pending': float(pending),
             'concessions': float(concessions),
             'defaulters_count': defaulters,
-            'collection_rate': round((collected/total_expected*100), 1) if total_expected else 0
+            'collection_rate': round(float(collected/total_expected*100), 1) if total_expected else 0
         },
         'charts': {'monthly_collections': chart_data},
         'recent_transactions': [{
@@ -56,54 +57,131 @@ def principal_fee_dashboard(request):
             'receipt': fee.receipt_number
         } for fee in recent]
     })
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_student_fee_status(request):
+    student_id = request.query_params.get('student_id')
+    if not student_id:
+        return Response({'error': 'Student ID required'}, status=400)
+    
+    try:
+        student = StudentProfile.objects.get(id=student_id)
+        now = timezone.now()
+        month_str = now.strftime('%b-%Y')
+        
+        # Check for existing fee record for current month
+        fee_record = StudentFee.objects.filter(
+            student=student, 
+            fee_structure__fee_month=month_str
+        ).first()
+        
+        if not fee_record:
+            return Response({
+                'exists': False,
+                'student': {
+                    'name': student.user.get_full_name(),
+                    'class': student.student_class.name if student.student_class else 'N/A'
+                }
+            })
+            
+        # Get transaction history
+        transactions = FeeTransaction.objects.filter(student_fee=fee_record).order_by('-payment_date')
+        
+        return Response({
+            'exists': True,
+            'fee_id': fee_record.id,
+            'total_assigned': float(fee_record.amount_due),
+            'concession': float(fee_record.concession_amount),
+            'final_total': float(fee_record.total_amount),
+            'balance': float(fee_record.balance_amount),
+            'is_paid': fee_record.is_paid,
+            'history': [{
+                'amount': float(t.amount_paid),
+                'method': t.payment_method,
+                'date': t.payment_date.strftime('%Y-%m-%d %H:%M'),
+                'receipt': t.receipt_number,
+                'notes': t.notes
+            } for t in transactions]
+        })
+    except StudentProfile.DoesNotExist:
+        return Response({'error': 'Student not found'}, status=404)
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def record_payment(request):
     data = request.data
     student_id = data.get('student_id')
-    amount_paid = data.get('amount_paid')
-    concession = data.get('concession', 0)
-    payment_method = data.get('payment_method', 'CASH')
-    receipt_no = data.get('receipt_no')
-    notes = data.get('notes', '')
-
+    mode = data.get('mode') # 'ASSIGN' or 'PAY'
+    
     try:
         student = StudentProfile.objects.get(id=student_id)
-        # Find or create a fee structure for this student's class group and current month
         now = timezone.now()
-        month_str = now.strftime('%b-%Y') # e.g. "Jan-2026"
+        month_str = now.strftime('%b-%Y')
         
-        # Determine class group (this is a bit simplified, usually mapping class to group)
-        class_group = student.student_class.class_group if student.student_class else '1-10'
-        
-        structure, _ = FeeStructure.objects.get_or_create(
-            class_group=class_group,
-            fee_month=month_str,
-            defaults={'amount': amount_paid + concession, 'due_date': now.date()}
-        )
-        
-        fee_record = StudentFee.objects.create(
-            student=student,
-            fee_structure=structure,
-            amount_due=amount_paid + concession,
-            concession_amount=concession,
-            is_paid=True,
-            payment_date=now,
-            payment_method=payment_method,
-            receipt_number=receipt_no,
-            notes=notes
-        )
-        
-        return Response({
-            'success': True, 
-            'message': 'Payment recorded successfully',
-            'payment': {
-                'id': fee_record.id,
-                'receipt_no': fee_record.receipt_number,
-                'amount': float(fee_record.final_amount)
-            }
-        })
+        if mode == 'ASSIGN':
+            total_fee = float(data.get('total_fee', 0))
+            concession = float(data.get('concession', 0))
+            
+            # Find or create structure
+            class_group = student.student_class.class_group if student.student_class else '1-10'
+            structure, _ = FeeStructure.objects.get_or_create(
+                class_group=class_group,
+                fee_month=month_str,
+                defaults={'amount': total_fee, 'due_date': now.date()}
+            )
+            
+            fee_record, created = StudentFee.objects.update_or_create(
+                student=student,
+                fee_structure=structure,
+                defaults={
+                    'amount_due': total_fee,
+                    'concession_amount': concession,
+                }
+            )
+            # update_or_create save() handles balance_amount for new ones in our updated model
+            
+            return Response({'success': True, 'message': 'Fee assigned successfully'})
+            
+        elif mode == 'PAY':
+            amount_paid = float(data.get('amount_paid', 0))
+            method = data.get('payment_method', 'CASH')
+            receipt = data.get('receipt_no', '')
+            notes = data.get('notes', '')
+            
+            fee_record = StudentFee.objects.filter(
+                student=student, 
+                fee_structure__fee_month=month_str
+            ).first()
+            
+            if not fee_record:
+                return Response({'error': 'No fee assigned for this student yet'}, status=400)
+            
+            # Create transaction
+            transaction = FeeTransaction.objects.create(
+                student_fee=fee_record,
+                amount_paid=amount_paid,
+                payment_method=method,
+                receipt_number=receipt,
+                payment_date=now,
+                recorded_by=request.user,
+                notes=notes
+            )
+            
+            # Update balance
+            fee_record.balance_amount -= Decimal(str(amount_paid))
+            # Also update legacy fields for backward compatibility
+            fee_record.payment_method = method
+            fee_record.payment_date = now
+            fee_record.receipt_number = receipt
+            fee_record.save()
+            
+            return Response({
+                'success': True, 
+                'balance': float(fee_record.balance_amount),
+                'receipt_no': transaction.receipt_number
+            })
+            
     except StudentProfile.DoesNotExist:
-        return Response({'success': False, 'message': 'Student not found'}, status=404)
+        return Response({'error': 'Student not found'}, status=404)
     except Exception as e:
         return Response({'success': False, 'message': str(e)}, status=400)
