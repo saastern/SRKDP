@@ -82,7 +82,7 @@ def class_attendance_today(request, class_id):
 @api_view(['GET'])
 def classes_list(request):
     """API: List all classes with student count"""
-    classes = Class.objects.all().order_by('name')
+    classes = Class.objects.all() # Meta ordering
     return Response({
         'classes': [
             {

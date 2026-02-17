@@ -24,5 +24,5 @@ class TeacherDashboardSerializer(serializers.ModelSerializer):
     
     def get_all_classes(self, obj):
         # Get ALL classes in the database
-        all_classes = Class.objects.all().order_by('name')
+        all_classes = Class.objects.all() # Meta ordering
         return ClassWithStudentCountSerializer(all_classes, many=True).data

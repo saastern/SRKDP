@@ -330,7 +330,7 @@ def get_student_attendance_summary(request, student_id):
 # ADD Django views for HTML pages (not API)
 def attendance_dashboard(request):
     """HTML view: Dashboard showing all classes"""
-    classes = Class.objects.all().order_by('name')
+    classes = Class.objects.all() # Rely on Meta ordering
     return render(request, 'attendance/dashboard.html', {'classes': classes})
 
 def class_students_summary(request, class_id):

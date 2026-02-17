@@ -224,11 +224,14 @@ def get_class_results(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def initialize_class_orders(request):
-    """Utility to set default class orders: Nursery=1, LKG=2, UKG=3, 1st=4..."""
+    """Utility to set default class orders with exact and partial matching"""
     order_map = {
         'Nursery': 1, 'LKG': 2, 'UKG': 3,
-        '1st': 4, '2nd': 5, '3rd': 6, '4th': 7, '5th': 8,
-        '6th': 9, '7th': 10, '8th': 11, '9th': 12, '10th': 13
+        '1st': 10, '2nd': 20, '3rd': 30, '4th': 40, '5th': 50,
+        '6th': 60, '7th': 70, '8th': 80, '9th': 90, '10th': 100,
+        # Common variations
+        '1': 10, '2': 20, '3': 30, '4': 40, '5': 50,
+        '6': 60, '7': 70, '8': 80, '9': 90, '10': 100
     }
     updated = 0
     for name, order in order_map.items():
@@ -241,7 +244,8 @@ class ClassListAPIView(APIView):
     permission_classes = [AllowAny]
     
     def get(self, request):
-        classes = Class.objects.all().order_by('order', 'name')
+        # Now relies on Meta: ordering = ['order', 'name']
+        classes = Class.objects.all()
         
         classes_data = []
         for cls in classes:

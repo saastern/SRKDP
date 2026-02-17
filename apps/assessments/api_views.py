@@ -173,7 +173,7 @@ def enter_marks(request):
 @api_view(['GET'])
 def get_classes_and_exams(request):
     """Get classes and exams for dropdowns"""
-    classes = Class.objects.all().order_by('name')
+    classes = Class.objects.all() # Rely on Meta ordering [order, name]
     exams = Exam.objects.filter(is_active=True).order_by('exam_type', 'order')
     
     return Response({
