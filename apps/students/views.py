@@ -119,6 +119,59 @@ def _create_student(class_obj, payload):
     return student
 
 
+def _update_student(student, payload):
+    """Apply an edit payload to an existing student (User + StudentProfile).
+
+    Only fields present in the payload are changed. Raises ValueError on
+    validation problems (e.g. duplicate roll number in the same class).
+    """
+    user = student.user
+
+    # Name -> first/last on the User
+    if 'name' in payload:
+        first_name, last_name = _split_name(payload.get('name', ''))
+        user.first_name = first_name
+        user.last_name = last_name
+
+    if 'parent_email' in payload:
+        user.email = payload.get('parent_email', '') or ''
+
+    # Roll number (unique within the student's current class, excluding self)
+    if 'roll_number' in payload:
+        roll_number = str(payload.get('roll_number', '')).strip()
+        if not roll_number:
+            raise ValueError('Roll number cannot be empty')
+        clash = StudentProfile.objects.filter(
+            student_class=student.student_class,
+            roll_number=roll_number,
+        ).exclude(id=student.id).exists()
+        if clash:
+            raise ValueError(
+                f'Roll number {roll_number} already exists in this class'
+            )
+        student.roll_number = roll_number
+
+    if 'father_name' in payload:
+        student.father_name = payload.get('father_name', '') or ''
+    if 'mother_name' in payload:
+        student.mother_name = payload.get('mother_name', '') or ''
+    if 'parent_email' in payload:
+        student.parent_email = payload.get('parent_email', '') or ''
+    if 'address' in payload:
+        student.address = payload.get('address', '') or ''
+    if 'gender' in payload:
+        student.gender = payload.get('gender', '') or ''
+    if 'parent_phone' in payload:
+        parent_phone = str(payload.get('parent_phone', '')).strip()
+        student.father_phone = parent_phone
+        student.mother_phone = parent_phone
+
+    with transaction.atomic():
+        user.save()
+        student.save()
+    return student
+
+
 # ---------------------------------------------------------------------------
 # Student management endpoints (used by the teacher "Manage Students" page)
 # ---------------------------------------------------------------------------
@@ -174,6 +227,28 @@ def add_student(request):
     })
 
 
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_student(request, student_id):
+    """PUT/PATCH /api/students/<student_id>/update/ - edit a student's details."""
+    student = StudentProfile.objects.select_related('user', 'student_class').filter(id=student_id).first()
+    if not student:
+        return Response({'success': False, 'message': 'Student not found'}, status=404)
+
+    try:
+        student = _update_student(student, request.data)
+    except ValueError as e:
+        return Response({'success': False, 'message': str(e)}, status=400)
+    except Exception as e:
+        return Response({'success': False, 'message': f'Error: {str(e)}'}, status=500)
+
+    return Response({
+        'success': True,
+        'message': 'Student updated successfully',
+        'student': _serialize_student(student),
+    })
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def add_students_bulk(request):
@@ -215,18 +290,30 @@ def add_students_bulk(request):
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def delete_student(request, student_id):
-    """DELETE /api/students/<student_id>/delete/ - remove a student (and their User)."""
-    try:
-        student = StudentProfile.objects.select_related('user').get(id=student_id)
-    except StudentProfile.DoesNotExist:
-        return Response({'success': False, 'message': 'Student not found'}, status=404)
+    """DELETE /api/students/<student_id>/delete/ - remove a student from their class.
+
+    This is a SOFT remove: the student is unassigned (student_class=null) and
+    their user is deactivated, but the record and all history (marks, attendance,
+    fees) are kept. This avoids a large cascade delete (no lag) and is idempotent
+    -- re-removing an already-removed student just returns success instead of a
+    404, so a stale list in the UI can't produce an error.
+    """
+    student = StudentProfile.objects.select_related('user').filter(id=student_id).first()
+    if not student:
+        # Already gone / never existed -> treat as success (idempotent).
+        return Response({'success': True, 'message': 'Student already removed'})
 
     name = student.user.get_full_name() or student.user.username
-    user = student.user
-    student.delete()
-    user.delete()
 
-    return Response({'success': True, 'message': f'{name} removed successfully'})
+    with transaction.atomic():
+        if student.student_class_id is not None:
+            student.student_class = None
+            student.save(update_fields=['student_class'])
+        if student.user.is_active:
+            student.user.is_active = False
+            student.user.save(update_fields=['is_active'])
+
+    return Response({'success': True, 'message': f'{name} removed from class'})
 
 
 # ---------------------------------------------------------------------------

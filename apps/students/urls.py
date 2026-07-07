@@ -8,6 +8,7 @@ urlpatterns = [
     path('class/<int:class_id>/', views.class_students, name='class_students'),
     path('add/', views.add_student, name='add_student'),
     path('add-bulk/', views.add_students_bulk, name='add_students_bulk'),
+    path('<int:student_id>/update/', views.update_student, name='update_student'),
 
     # Promotion / year rollover (Settings -> Promote Students)
     path('classes/set-orders/', views.set_class_orders, name='set_class_orders'),
